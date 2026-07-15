@@ -1,0 +1,1 @@
+{"name":"ETF量化分析","short_name":"量化ETF","description":"场内ETF+场外基金双引擎量化分析","start_url":"/etf-quant/","display":"standalone","background_color":"#0d1117","theme_color":"#0d1117","lang":"en","scope":"/etf-quant/","orientation":"portrait","icons":[{"src":"icons/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icons/icon-512.png","sizes":"512x512","type":"image/png"}]}

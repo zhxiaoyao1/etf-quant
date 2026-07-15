@@ -1,0 +1,73 @@
+<h2>统一信号体系 · 最终版</h2>
+<p class="subtitle">买入阈值统一 ≥80 · 只看高确定性机会</p>
+
+<div class="section">
+  <h3>📊 三场景信号对照</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr style="border-bottom:1px solid #30363d;">
+          <th style="padding:8px;text-align:left;color:#f0f6fc;"></th>
+          <th style="padding:8px;text-align:center;color:#f0f6fc;">📈 场内 ETF</th>
+          <th style="padding:8px;text-align:center;color:#f0f6fc;">🏦 场外-筛选</th>
+          <th style="padding:8px;text-align:center;color:#f0f6fc;">🩺 场外-诊断</th>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#8b949e;">更新频率</td>
+          <td style="padding:8px;text-align:center;color:#c9d1d9;">每日</td>
+          <td style="padding:8px;text-align:center;color:#c9d1d9;">每周</td>
+          <td style="padding:8px;text-align:center;color:#c9d1d9;">每两周</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#8b949e;">🟢 买入</td>
+          <td style="padding:8px;text-align:center;color:#3fb950;font-weight:700;">≥80 买入</td>
+          <td style="padding:8px;text-align:center;color:#3fb950;font-weight:700;">≥80 可买入</td>
+          <td style="padding:8px;text-align:center;color:#3fb950;font-weight:700;">≥80 继续持有</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#8b949e;">🟡 观望</td>
+          <td style="padding:8px;text-align:center;color:#d2991d;">40-79 观望</td>
+          <td style="padding:8px;text-align:center;color:#d2991d;">40-79 可关注</td>
+          <td style="padding:8px;text-align:center;color:#d2991d;">40-79 减仓观察</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#8b949e;">🔴 卖出</td>
+          <td style="padding:8px;text-align:center;color:#f85149;">&lt;40 卖出</td>
+          <td style="padding:8px;text-align:center;color:#f85149;">&lt;40 不推荐</td>
+          <td style="padding:8px;text-align:center;color:#f85149;">&lt;40 建议换基</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🎯 设计意图</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="placeholder" style="flex:1;min-width:180px;">
+      <strong>减少噪音</strong><br>
+      <small>≥80 意味着多因子高度共振<br>不是模棱两可的机会</small>
+    </div>
+    <div class="placeholder" style="flex:1;min-width:180px;">
+      <strong>控制交易频率</strong><br>
+      <small>只抓高确定性的买点<br>减少频繁进出带来的摩擦成本</small>
+    </div>
+    <div class="placeholder" style="flex:1;min-width:180px;">
+      <strong>拉开信号间距</strong><br>
+      <small>买入 80 / 卖出 40<br>中间有 40 分的观望区间<br>不会昨天买今天卖</small>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔄 自学习与阈值</h3>
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;">
+    <p style="color:#c9d1d9;font-size:13px;margin:0;">
+      <strong>阈值也是可学习的。</strong>系统会统计：如果历史上把买入线定在 80 分，实际胜率是多少？定在 75 分呢？
+    </p>
+    <p style="color:#8b949e;font-size:12px;margin:8px 0 0 0;">
+      后续可在设置页面调整阈值（比如激进时降到75，保守时升到85），也可以在积累足够数据后让系统推荐最优阈值。<br>
+      <strong>但默认值永远是 80</strong>——由你决定是否改。
+    </p>
+  </div>
+</div>
