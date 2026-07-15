@@ -104,7 +104,7 @@ export default function Settings() {
           <label>买入阈值</label>
           <input
             type="range"
-            min={60}
+            min={30}
             max={95}
             value={buyThreshold}
             onChange={e => setBuyThreshold(Number(e.target.value))}
@@ -116,7 +116,7 @@ export default function Settings() {
           <input
             type="range"
             min={10}
-            max={50}
+            max={60}
             value={sellThreshold}
             onChange={e => setSellThreshold(Number(e.target.value))}
           />
