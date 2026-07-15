@@ -3,7 +3,7 @@ import { createChart, CrosshairMode } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
 import { getETFList, getKLines, getSignals, getWeights } from '../data/db'
-import { runBacktest, type BacktestResult } from '../engine/etf/backtest'
+import { runBacktest, optimizeThresholds, type BacktestResult } from '../engine/etf/backtest'
 import { useETFWorker } from '../hooks/useWorker'
 import './Detail.css'
 
@@ -206,6 +206,24 @@ export default function Detail() {
     series.setMarkers(markers)
   }, [backtestResult])
 
+  const handleOptimize = async () => {
+    if (!selectedETF || bars.length < 80) return
+    setBacktesting(true)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    try {
+      const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
+      const opt = optimizeThresholds(bars, weights)
+      setBtBuy(opt.bestBuy)
+      setBtSell(opt.bestSell)
+      setBacktestResult(opt.bestResult)
+      setTimeout(() => {
+        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
   const handleAnalyze = async () => {
     if (!selectedETF) return
     const newSignals = await analyze([selectedETF])
@@ -385,13 +403,22 @@ export default function Detail() {
           ⚠️ 回测需要至少80天K线数据（当前仅{bars.length}天），请先点「刷新」拉取数据
         </div>
       )}
-      <button
-        className={`backtest-btn${backtesting ? ' loading' : ''}`}
-        onClick={handleBacktest}
-        disabled={backtesting || bars.length < 80}
-      >
-        {backtesting ? '⏳ 回测计算中...' : bars.length < 80 ? `📊 回测（需≥80天，当前${bars.length}）` : '📊 回测'}
-      </button>
+      <div className="bt-buttons">
+        <button
+          className={`backtest-btn${backtesting ? ' loading' : ''}`}
+          onClick={handleBacktest}
+          disabled={backtesting || bars.length < 80}
+        >
+          {backtesting ? '⏳ 计算中...' : bars.length < 80 ? `📊 回测（需≥80天，当前${bars.length}）` : '📊 回测'}
+        </button>
+        <button
+          className="optimize-btn"
+          onClick={handleOptimize}
+          disabled={backtesting || bars.length < 80}
+        >
+          🤖 自动寻优
+        </button>
+      </div>
     </div>
   )
 }

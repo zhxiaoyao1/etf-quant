@@ -170,3 +170,62 @@ export function runBacktest(
     buyAndHoldReturn,
   }
 }
+
+export interface OptimizeResult {
+  bestBuy: number
+  bestSell: number
+  bestResult: BacktestResult
+  tested: number  // how many combinations tried
+}
+
+/**
+ * Auto-optimize buy/sell thresholds
+ * Tests combinations of buy (50-90 step 5) × sell (20-50 step 5)
+ * Picks the one with highest total return that still has ≥3 trades
+ */
+export function optimizeThresholds(
+  bars: KLine[],
+  weights: Record<string, number>
+): OptimizeResult {
+  let bestBuy = 70
+  let bestSell = 40
+  let bestResult: BacktestResult | null = null
+  let bestScore = -Infinity
+  let tested = 0
+
+  for (let buy = 55; buy <= 85; buy += 5) {
+    for (let sell = 25; sell <= 45; sell += 5) {
+      tested++
+      const result = runBacktest(bars, weights, { buyThreshold: buy, sellThreshold: sell })
+      // 评分：优先回报率，但要求至少3笔交易才有统计意义
+      if (result.totalTrades >= 3) {
+        const score = result.totalReturn * 0.5 + result.sharpeRatio * 0.3 - Math.abs(result.maxDrawdown) * 0.2
+        if (score > bestScore) {
+          bestScore = score
+          bestBuy = buy
+          bestSell = sell
+          bestResult = result
+        }
+      }
+    }
+  }
+
+  if (!bestResult) {
+    // 如果没有任何组合达到3笔交易，选交易最多的
+    let maxTrades = 0
+    for (let buy = 50; buy <= 90; buy += 5) {
+      for (let sell = 20; sell <= 55; sell += 5) {
+        const result = runBacktest(bars, weights, { buyThreshold: buy, sellThreshold: sell })
+        if (result.totalTrades > maxTrades) {
+          maxTrades = result.totalTrades
+          bestBuy = buy
+          bestSell = sell
+          bestResult = result
+        }
+      }
+      tested++
+    }
+  }
+
+  return { bestBuy, bestSell, bestResult: bestResult!, tested }
+}
