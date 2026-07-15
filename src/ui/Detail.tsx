@@ -74,7 +74,9 @@ export default function Detail() {
         timeVisible: false,
         secondsVisible: false,
         rightOffset: 0,
-        barSpacing: Math.max(4, (container.clientWidth - 60) / bars.length),
+        fixLeftEdge: true,
+        fixRightEdge: true,
+        lockVisibleTimeRangeOnResize: true,
       },
       rightPriceScale: {
         borderColor: '#30363d',
