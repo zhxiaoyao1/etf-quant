@@ -52,17 +52,27 @@ export function runBacktest(
   let buyDate = ''
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
-  // We need at least 60 bars for factor calculation. Start from bar 60.
-  const startIdx = 60
+  const startIdx = 61  // Need at least 60 bars + 1 previous day for crossover
+  let prevScore = 50
+
+  // 初始化前一天的分数
+  if (bars.length > 60) {
+    const initResult = scoreETF(bars.slice(0, 60), weights, thresholds)
+    prevScore = initResult.compositeScore
+  }
 
   for (let i = startIdx; i < bars.length - 1; i++) {
     const windowBars = bars.slice(0, i + 1)
     const result = scoreETF(windowBars, weights, thresholds)
+    const currentScore = result.compositeScore
     const currentPrice = bars[i].close
 
-    // Check buy signal
-    if (!holding && result.signal === 'buy') {
-      // Buy at next day's open
+    // 买入：分数从下方穿越买入线（从小变大）
+    const crossedBuy = prevScore < thresholds.buyThreshold && currentScore >= thresholds.buyThreshold
+    // 卖出：分数从上方穿越卖出线（从大变小）
+    const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
+
+    if (!holding && crossedBuy) {
       const nextOpen = bars[i + 1].open
       shares = cash / nextOpen
       cash = 0
@@ -70,8 +80,7 @@ export function runBacktest(
       buyPrice = nextOpen
       buyDate = bars[i + 1].date
     }
-    // Check sell signal
-    else if (holding && result.signal === 'sell') {
+    else if (holding && crossedSell) {
       // Sell at next day's open
       const nextOpen = bars[i + 1].open
       cash = shares * nextOpen
@@ -93,6 +102,7 @@ export function runBacktest(
     // Track equity
     const equity = cash + shares * currentPrice
     equityCurve.push({ date: bars[i].date, value: equity })
+    prevScore = currentScore
   }
 
   // If still holding at end, close position
