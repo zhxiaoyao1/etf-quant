@@ -108,5 +108,24 @@ export function useETFWorker() {
     []
   )
 
-  return { fetchAndStore, analyze, learn, backtest, optimize, loading }
+  const optimizeAll = useCallback(
+    (etfCode: string): Promise<{ bestWeights: Record<string, number>; bestBuy: number; bestSell: number; result: any }> => {
+      return new Promise((resolve, reject) => {
+        const worker = createWorker()
+        setLoading(true)
+        worker.onmessage = (e) => {
+          setLoading(false)
+          worker.terminate()
+          if (e.data.type === 'optimizeAllResult') {
+            resolve({ bestWeights: e.data.bestWeights, bestBuy: e.data.bestBuy, bestSell: e.data.bestSell, result: e.data.result })
+          } else if (e.data.type === 'error') reject(new Error(e.data.message))
+        }
+        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
+        worker.postMessage({ type: 'optimizeAll', etfCode })
+      })
+    },
+    []
+  )
+
+  return { fetchAndStore, analyze, learn, backtest, optimize, optimizeAll, loading }
 }

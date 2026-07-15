@@ -130,6 +130,16 @@
   cursor: pointer;
 }
 .optimize-btn:disabled { opacity: 0.4; }
+.optimize-all-btn {
+  padding: 12px;
+  background: #1a2332;
+  color: #bc8cff;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.optimize-all-btn:disabled { opacity: 0.4; }
 .backtest-controls {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -157,6 +167,11 @@
   margin-top: 8px;
 }
 .backtest-period {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.backtest-params {
   color: var(--text-secondary);
   font-size: 12px;
   margin-bottom: 12px;

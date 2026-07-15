@@ -257,3 +257,68 @@ export function optimizeThresholds(
 
   return { bestBuy, bestSell, bestResult: bestResult!, tested }
 }
+
+/** 生成所有有效的权重组合（4因子，每因子10%-50%，步长10%，总和=100%） */
+function* weightCombinations(): Generator<Record<string, number>> {
+  const factors = ['trend', 'momentum', 'volatility', 'moneyFlow']
+  for (let w1 = 10; w1 <= 50; w1 += 10) {
+    for (let w2 = 10; w2 <= 50; w2 += 10) {
+      for (let w3 = 10; w3 <= 50; w3 += 10) {
+        const w4 = 100 - w1 - w2 - w3
+        if (w4 >= 10 && w4 <= 50) {
+          yield {
+            [factors[0]]: w1 / 100,
+            [factors[1]]: w2 / 100,
+            [factors[2]]: w3 / 100,
+            [factors[3]]: w4 / 100,
+          }
+        }
+      }
+    }
+  }
+}
+
+export interface OptimizeAllResult {
+  bestWeights: Record<string, number>
+  bestBuy: number
+  bestSell: number
+  bestResult: BacktestResult
+  tested: number
+}
+
+/** 同时优化因子权重 + 买卖阈值 */
+export function optimizeAll(bars: KLine[]): OptimizeAllResult {
+  let bestWeights: Record<string, number> = { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 }
+  let bestBuy = 70
+  let bestSell = 40
+  let bestResult: BacktestResult | null = null
+  let bestScore = -Infinity
+  let tested = 0
+
+  for (const w of weightCombinations()) {
+    for (let buy = 55; buy <= 85; buy += 5) {
+      for (let sell = 25; sell <= 45; sell += 5) {
+        tested++
+        const result = runBacktest(bars, w, { buyThreshold: buy, sellThreshold: sell })
+        if (result.totalTrades >= 3) {
+          const score = result.totalReturn * 0.4 - Math.abs(result.maxDrawdown) * 0.4 + result.sharpeRatio * 0.2
+          if (score > bestScore) {
+            bestScore = score
+            bestWeights = { ...w }
+            bestBuy = buy
+            bestSell = sell
+            bestResult = result
+          }
+        }
+      }
+    }
+  }
+
+  if (!bestResult) {
+    // fallback: 用默认权重优化阈值
+    const fallback = optimizeThresholds(bars, { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 })
+    return { bestWeights: { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 }, bestBuy: fallback.bestBuy, bestSell: fallback.bestSell, bestResult: fallback.bestResult, tested: fallback.tested }
+  }
+
+  return { bestWeights, bestBuy, bestSell, bestResult: bestResult!, tested }
+}

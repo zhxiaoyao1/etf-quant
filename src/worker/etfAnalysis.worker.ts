@@ -1,7 +1,7 @@
 import type { Signal, ETFInfo, SignalThresholds, LearningConfig, LearningLog } from '../types'
 import { scoreETF } from '../engine/etf/scorer'
 import { adjustWeights } from '../engine/etf/learner'
-import { runBacktest, optimizeThresholds } from '../engine/etf/backtest'
+import { runBacktest, optimizeThresholds, optimizeAll } from '../engine/etf/backtest'
 import { fetchAllETFs } from '../data/etfFetcher'
 import { getKLines, saveKLines, saveSignal, getSignals, getWeights, saveWeights, saveLearningLog } from '../data/db'
 import { DEFAULT_ETF_WEIGHTS, DEFAULT_SIGNAL_THRESHOLDS, DEFAULT_LEARNING_CONFIG } from '../config/defaults'
@@ -12,6 +12,7 @@ type WorkerMessage =
   | { type: 'fetchAndStore'; etfs: ETFInfo[] }
   | { type: 'backtest'; etfCode: string; buyThreshold: number; sellThreshold: number }
   | { type: 'optimize'; etfCode: string }
+  | { type: 'optimizeAll'; etfCode: string }
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const msg = e.data
@@ -104,6 +105,22 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       const weights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
       const opt = optimizeThresholds(bars, weights)
       self.postMessage({ type: 'optimizeResult', bestBuy: opt.bestBuy, bestSell: opt.bestSell, result: opt.bestResult })
+
+    } else if (msg.type === 'optimizeAll') {
+      const { etfCode } = msg
+      const bars = await getKLines(etfCode)
+      if (bars.length < 80) {
+        self.postMessage({ type: 'error', message: `需要至少80天K线数据，当前${bars.length}天` })
+        return
+      }
+      const opt = optimizeAll(bars)
+      self.postMessage({
+        type: 'optimizeAllResult',
+        bestWeights: opt.bestWeights,
+        bestBuy: opt.bestBuy,
+        bestSell: opt.bestSell,
+        result: opt.bestResult,
+      })
     }
 
   } catch (err) {

@@ -23,7 +23,7 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize } = useETFWorker()
+  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, optimizeAll: workerOptimizeAll } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
@@ -248,6 +248,30 @@ export default function Detail() {
     }
   }
 
+  const handleOptimizeAll = async () => {
+    if (!selectedETF) return
+    setBtError('')
+    setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
+    try {
+      const opt = await workerOptimizeAll(selectedETF.code)
+      setBtBuy(opt.bestBuy)
+      setBtSell(opt.bestSell)
+      setBacktestResult(opt.result)
+      // 把优化后的权重存到 IndexedDB
+      const { saveWeights } = await import('../data/db')
+      await saveWeights('etf', opt.bestWeights)
+      setTimeout(() => {
+        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } catch (err: any) {
+      setBtError(err?.message || '全优化失败，请重试')
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
   const handleAnalyze = async () => {
     if (!selectedETF) return
     const newSignals = await analyze([selectedETF])
@@ -352,7 +376,13 @@ export default function Detail() {
           <h3 style={{ marginTop: 16, marginBottom: 4 }}>📊 回测结果 - {selectedETF?.name}</h3>
           <div className="backtest-period">
             {selectedETF?.code}.{selectedETF?.market} · 回测区间：{backtestResult.equityCurve[0].date} ~ {backtestResult.equityCurve[backtestResult.equityCurve.length - 1].date}
-            · 共 {backtestResult.equityCurve.length} 个交易日 · 买入≥{btBuy} 卖出&lt;{btSell}
+            · 共 {backtestResult.equityCurve.length} 个交易日
+          </div>
+          <div className="backtest-params">
+            买入≥{btBuy} 卖出&lt;{btSell}
+            {backtestResult.weights && (
+              <span> · 权重：趋势{(backtestResult.weights.trend * 100).toFixed(0)}% 动量{(backtestResult.weights.momentum * 100).toFixed(0)}% 波动{(backtestResult.weights.volatility * 100).toFixed(0)}% 资金{(backtestResult.weights.moneyFlow * 100).toFixed(0)}%</span>
+            )}
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">
@@ -439,7 +469,14 @@ export default function Detail() {
           onClick={handleOptimize}
           disabled={backtesting}
         >
-          🤖 自动寻优
+          🤖 寻优阈值
+        </button>
+        <button
+          className="optimize-all-btn"
+          onClick={handleOptimizeAll}
+          disabled={backtesting}
+        >
+          🧬 寻优权重+阈值
         </button>
       </div>
     </div>
