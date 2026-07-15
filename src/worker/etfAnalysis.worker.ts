@@ -3,7 +3,7 @@ import { scoreETF } from '../engine/etf/scorer'
 import { adjustWeights } from '../engine/etf/learner'
 import { runBacktest, optimizeThresholds, optimizeAll } from '../engine/etf/backtest'
 import { fetchAllETFs } from '../data/etfFetcher'
-import { getKLines, saveKLines, saveSignal, getSignals, getWeights, saveWeights, saveLearningLog } from '../data/db'
+import { getKLines, saveKLines, saveSignal, getSignals, getWeights, saveWeights, saveLearningLog, getSetting } from '../data/db'
 import { DEFAULT_ETF_WEIGHTS, DEFAULT_SIGNAL_THRESHOLDS, DEFAULT_LEARNING_CONFIG } from '../config/defaults'
 
 type WorkerMessage =
@@ -28,7 +28,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           weights = { ...DEFAULT_ETF_WEIGHTS }
           await saveWeights('etf', weights)
         }
-        const result = scoreETF(bars, weights, thresholds ?? DEFAULT_SIGNAL_THRESHOLDS)
+        const savedBuy = await getSetting<number>('buyThreshold')
+        const savedSell = await getSetting<number>('sellThreshold')
+        const effective = thresholds ?? ((savedBuy && savedSell) ? { buyThreshold: savedBuy, sellThreshold: savedSell } : DEFAULT_SIGNAL_THRESHOLDS)
+        const result = scoreETF(bars, weights, effective)
         const signal: Signal = {
           id: `etf-${etf.code}-${new Date().toISOString().slice(0, 10)}`,
           etfCode: etf.code,
