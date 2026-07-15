@@ -8,6 +8,8 @@ import './Dashboard.css'
 export default function Dashboard() {
   const [etfs, setEtfs] = useState<ETFInfo[]>([])
   const [signals, setSignals] = useState<Map<string, Signal>>(new Map())
+  const [modalETF, setModalETF] = useState<ETFInfo | null>(null)
+  const [recentScores, setRecentScores] = useState<Signal[]>([])
   const { fetchAndStore, analyze, loading } = useETFWorker()
 
   useEffect(() => {
@@ -30,6 +32,12 @@ export default function Dashboard() {
       setSignals(map)
     })
   }, [])
+
+  const handleCardClick = async (etf: ETFInfo) => {
+    setModalETF(etf)
+    const sigs = await getSignals({ etfCode: etf.code, limit: 10 })
+    setRecentScores(sigs)
+  }
 
   const handleRefresh = async () => {
     if (etfs.length === 0) return
@@ -67,7 +75,7 @@ export default function Dashboard() {
         {etfs.map(etf => {
           const sig = signals.get(etf.code)
           return (
-            <div key={etf.code} className="etf-card">
+            <div key={etf.code} className="etf-card" onClick={() => handleCardClick(etf)}>
               <div className="etf-info">
                 <div className="etf-name">{etf.name}</div>
                 <div className="etf-code">{etf.code}.{etf.market}</div>
@@ -90,6 +98,38 @@ export default function Dashboard() {
           )
         })}
       </div>
+
+      {/* 近十日分数弹窗 */}
+      {modalETF && (
+        <div className="score-modal-overlay" onClick={() => setModalETF(null)}>
+          <div className="score-modal" onClick={e => e.stopPropagation()}>
+            <div className="score-modal-header">
+              <h3>{modalETF.name}</h3>
+              <span className="score-modal-code">{modalETF.code}.{modalETF.market}</span>
+              <button className="score-modal-close" onClick={() => setModalETF(null)}>✕</button>
+            </div>
+            <div className="score-list">
+              {recentScores.length === 0 ? (
+                <p className="score-empty">暂无评分记录，请先点刷新</p>
+              ) : (
+                recentScores.map((s, i) => (
+                  <div key={s.id} className="score-row">
+                    <span className="score-date">{s.date}</span>
+                    <span className="score-trend">
+                      {i < recentScores.length - 1 && (
+                        s.compositeScore > recentScores[i + 1].compositeScore ? '↑' :
+                        s.compositeScore < recentScores[i + 1].compositeScore ? '↓' : '→'
+                      )}
+                    </span>
+                    <span className="score-emoji">{signalEmoji(s.signal)}</span>
+                    <span className="score-num" style={{ color: scoreColor(s.signal) }}>{s.compositeScore}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
