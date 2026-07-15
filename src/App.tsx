@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import Dashboard from './ui/Dashboard'
 import Detail from './ui/Detail'
+import FundPicker from './ui/FundPicker'
 import Factors from './ui/Factors'
 import Settings from './ui/Settings'
 
@@ -23,7 +24,7 @@ function App() {
       <div className="app-content">
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'detail' && <Detail />}
-        {activeTab === 'fundpicker' && <div>选基</div>}
+        {activeTab === 'fundpicker' && <FundPicker />}
         {activeTab === 'factors' && <Factors />}
         {activeTab === 'settings' && <Settings />}
       </div>
