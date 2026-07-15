@@ -52,16 +52,20 @@ export function runBacktest(
   let buyDate = ''
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
-  const TREND_WINDOW = 8  // 趋势判断窗口
   const startIdx = 61
-  const scoreHistory: number[] = []
   let prevScore = 50
 
-  // 初始化前60天的分数
   if (bars.length > 60) {
     const initResult = scoreETF(bars.slice(0, 60), weights, thresholds)
     prevScore = initResult.compositeScore
-    scoreHistory.push(initResult.compositeScore)
+  }
+
+  // 简易均线：最近 N 根 bar 的收盘均价
+  const smaAt = (idx: number, period: number) => {
+    if (idx < period - 1) return 0
+    let sum = 0
+    for (let j = idx - period + 1; j <= idx; j++) sum += bars[j].close
+    return sum / period
   }
 
   for (let i = startIdx; i < bars.length - 1; i++) {
@@ -69,23 +73,20 @@ export function runBacktest(
     const result = scoreETF(windowBars, weights, thresholds)
     const currentScore = result.compositeScore
     const currentPrice = bars[i].close
-    scoreHistory.push(currentScore)
 
-    // 计算分数趋势：最近 TREND_WINDOW 天是涨还是跌
-    const trendScores = scoreHistory.slice(-TREND_WINDOW)
-    const trendSlope = trendScores.length >= 5
-      ? trendScores[trendScores.length - 1] - trendScores[0]
-      : 0
-    const scoreTrending = trendSlope > 2   // 上升趋势
-    const scoreFalling = trendSlope < -2    // 下降趋势
+    // 价格大趋势：MA20 的斜率判断中长期方向
+    const ma20Now = smaAt(i, 20)
+    const ma20Prev = smaAt(i - 10, 20)
+    const priceTrendUp = ma20Now > ma20Prev       // MA20 向上 = 上升趋势
+    const priceTrendDown = ma20Now < ma20Prev      // MA20 向下 = 下降趋势
 
-    // 买入：分数穿越买入线 + 趋势向上（分数在涨，不是假突破）
+    // 买入：分数穿越买入线 + 价格大趋势向上（震荡上涨也能买）
     const crossedBuy = prevScore < thresholds.buyThreshold && currentScore >= thresholds.buyThreshold
-    const validBuy = crossedBuy && scoreTrending
+    const validBuy = crossedBuy && priceTrendUp
 
-    // 卖出：分数穿越卖出线 + 趋势向下（分数在跌，不是假跌破）
+    // 卖出：分数穿越卖出线 + 价格大趋势向下
     const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
-    const validSell = crossedSell && scoreFalling
+    const validSell = crossedSell && priceTrendDown
 
     if (!holding && validBuy) {
       const nextOpen = bars[i + 1].open
