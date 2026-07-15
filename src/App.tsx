@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import Dashboard from './ui/Dashboard'
 import Detail from './ui/Detail'
@@ -10,18 +10,37 @@ type Tab = 'dashboard' | 'detail' | 'fundpicker' | 'factors' | 'settings'
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: 'dashboard', label: '看板', icon: '\u{1F4CA}' },
-    { key: 'detail', label: '详情', icon: '\u{1F50D}' },
-    { key: 'fundpicker', label: '选基', icon: '\u{1F3E6}' },
-    { key: 'factors', label: '因子', icon: '\u{1F9E0}' },
-    { key: 'settings', label: '设置', icon: '\u{2699}\u{FE0F}' },
+    { key: 'dashboard', label: '看板', icon: '📊' },
+    { key: 'detail', label: '详情', icon: '🔍' },
+    { key: 'fundpicker', label: '选基', icon: '🏦' },
+    { key: 'factors', label: '因子', icon: '🧠' },
+    { key: 'settings', label: '设置', icon: '⚙️' },
   ]
 
+  // 手机端：只显示看板，无底部导航
+  if (isMobile) {
+    return (
+      <div className="app">
+        <div className="app-content app-mobile">
+          <Dashboard mobile />
+        </div>
+      </div>
+    )
+  }
+
+  // 电脑端：完整5 Tab 布局
   return (
     <div className="app">
-      <div className="app-content">
+      <div className="app-content app-desktop">
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'detail' && <Detail />}
         {activeTab === 'fundpicker' && <FundPicker />}
