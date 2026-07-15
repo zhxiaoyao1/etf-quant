@@ -35,6 +35,13 @@
 }
 .factor-name { font-size: 11px; color: var(--text-secondary); }
 .factor-value { font-size: 20px; font-weight: 700; }
+.chart-container {
+  width: 100%;
+  height: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
 .chart-placeholder {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -42,6 +49,11 @@
   padding: 40px;
   text-align: center;
   color: var(--text-secondary);
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 .chart-placeholder .sub { font-size: 12px; margin-top: 4px; }
 .signal-history { display: flex; flex-direction: column; gap: 4px; }

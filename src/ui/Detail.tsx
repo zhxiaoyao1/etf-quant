@@ -1,9 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createChart, CrosshairMode } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { getETFList, getKLines, getSignals } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import './Detail.css'
+
+function calcMA(data: { time: string; value: number }[], period: number): { time: string; value: number }[] {
+  const result: { time: string; value: number }[] = []
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0
+    for (let j = i - period + 1; j <= i; j++) {
+      sum += data[j].value
+    }
+    result.push({ time: data[i].time, value: sum / period })
+  }
+  return result
+}
 
 export default function Detail() {
   const [etfs, setEtfs] = useState<ETFInfo[]>(DEFAULT_ETF_LIST)
@@ -11,6 +24,9 @@ export default function Detail() {
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
   const { analyze, loading } = useETFWorker()
+
+  const chartContainerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
 
   useEffect(() => {
     getETFList().then(list => {
@@ -23,6 +39,124 @@ export default function Detail() {
     getKLines(selectedETF.code).then(setBars)
     getSignals({ etfCode: selectedETF.code, limit: 20 }).then(setSignals)
   }, [selectedETF])
+
+  const renderChart = useCallback(() => {
+    const container = chartContainerRef.current
+    if (!container || bars.length === 0) return
+
+    // Clean up previous chart
+    if (chartRef.current) {
+      chartRef.current.remove()
+      chartRef.current = null
+    }
+
+    const chart = createChart(container, {
+      layout: {
+        background: { color: '#0d1117' },
+        textColor: '#8b949e',
+      },
+      grid: {
+        vertLines: { color: '#21262d' },
+        horzLines: { color: '#21262d' },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+      },
+      timeScale: {
+        borderColor: '#30363d',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      rightPriceScale: {
+        borderColor: '#30363d',
+      },
+      width: container.clientWidth,
+      height: 300,
+    })
+
+    // Candlestick series
+    const candleData = bars.map(bar => ({
+      time: bar.date,
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      close: bar.close,
+    }))
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: '#26a641',
+      downColor: '#ef4147',
+      borderUpColor: '#26a641',
+      borderDownColor: '#ef4147',
+      wickUpColor: '#26a641',
+      wickDownColor: '#ef4147',
+    })
+    candleSeries.setData(candleData)
+
+    // Build close-price series for MA calculation
+    const closeSeries = bars.map(bar => ({
+      time: bar.date,
+      value: bar.close,
+    }))
+
+    // MA5 (yellow)
+    if (bars.length >= 5) {
+      const ma5Data = calcMA(closeSeries, 5)
+      const ma5Series = chart.addLineSeries({
+        color: '#e5c73c',
+        lineWidth: 1,
+      })
+      ma5Series.setData(ma5Data)
+    }
+
+    // MA20 (blue)
+    if (bars.length >= 20) {
+      const ma20Data = calcMA(closeSeries, 20)
+      const ma20Series = chart.addLineSeries({
+        color: '#58a6ff',
+        lineWidth: 1,
+      })
+      ma20Series.setData(ma20Data)
+    }
+
+    // MA60 (purple)
+    if (bars.length >= 60) {
+      const ma60Data = calcMA(closeSeries, 60)
+      const ma60Series = chart.addLineSeries({
+        color: '#bc8cff',
+        lineWidth: 1,
+      })
+      ma60Series.setData(ma60Data)
+    }
+
+    chart.timeScale().fitContent()
+
+    // ResizeObserver
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        chart.applyOptions({ width, height })
+      }
+    })
+    resizeObserver.observe(container)
+
+    chartRef.current = chart
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [bars])
+
+  useEffect(() => {
+    const cleanup = renderChart()
+    return () => {
+      cleanup?.()
+      if (chartRef.current) {
+        chartRef.current.remove()
+        chartRef.current = null
+      }
+    }
+  }, [renderChart])
 
   const handleAnalyze = async () => {
     if (!selectedETF) return
@@ -70,10 +204,14 @@ export default function Detail() {
         </div>
       )}
 
-      <div className="chart-placeholder">
-        <p>{'\u{1F4C8}'} K线图区域</p>
-        <p className="sub">数据点数: {bars.length}</p>
-      </div>
+      {bars.length > 0 ? (
+        <div ref={chartContainerRef} className="chart-container" />
+      ) : (
+        <div className="chart-placeholder">
+          <p>{'\u{1F4C8}'} K线图区域</p>
+          <p className="sub">数据点数: {bars.length}</p>
+        </div>
+      )}
 
       <h3 style={{ marginTop: 16, marginBottom: 8 }}>信号历史</h3>
       <div className="signal-history">
