@@ -199,7 +199,9 @@ export function optimizeThresholds(
       const result = runBacktest(bars, weights, { buyThreshold: buy, sellThreshold: sell })
       // 评分：优先回报率，但要求至少3笔交易才有统计意义
       if (result.totalTrades >= 3) {
-        const score = result.totalReturn * 0.5 + result.sharpeRatio * 0.3 - Math.abs(result.maxDrawdown) * 0.2
+        // 综合评分：收益40% + 回撤控制40% + 夏普比率20%
+        // 收益尽可能大，回撤尽可能小
+        const score = result.totalReturn * 0.4 - Math.abs(result.maxDrawdown) * 0.4 + result.sharpeRatio * 0.2
         if (score > bestScore) {
           bestScore = score
           bestBuy = buy
