@@ -67,14 +67,21 @@ export default function Detail() {
       },
       timeScale: {
         borderColor: '#30363d',
-        timeVisible: true,
+        timeVisible: false,
         secondsVisible: false,
+        rightOffset: 0,
+        barSpacing: Math.max(4, (container.clientWidth - 60) / bars.length),
       },
       rightPriceScale: {
         borderColor: '#30363d',
+        scaleMargins: { top: 0.05, bottom: 0.05 },
       },
+      leftPriceScale: {
+        visible: false,
+      },
+      handleScroll: { vertTouchDrag: false },
       width: container.clientWidth,
-      height: 300,
+      height: 280,
     })
 
     // Candlestick series
