@@ -74,11 +74,11 @@ export function runBacktest(
     const currentScore = result.compositeScore
     const currentPrice = bars[i].close
 
-    // 价格大趋势：MA20 的斜率判断中长期方向
-    const ma20Now = smaAt(i, 20)
-    const ma20Prev = smaAt(i - 10, 20)
-    const priceTrendUp = ma20Now > ma20Prev       // MA20 向上 = 上升趋势
-    const priceTrendDown = ma20Now < ma20Prev      // MA20 向下 = 下降趋势
+    // 趋势判断：MA5 斜率判断短期方向
+    const maNow = smaAt(i, 5)
+    const maPrev = smaAt(i - 3, 5)
+    const priceTrendUp = maNow > maPrev
+    const priceTrendDown = maNow < maPrev
 
     // 买入：分数穿越买入线 + 价格大趋势向上（震荡上涨也能买）
     const crossedBuy = prevScore < thresholds.buyThreshold && currentScore >= thresholds.buyThreshold
