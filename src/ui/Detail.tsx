@@ -30,6 +30,7 @@ export default function Detail() {
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
+  const candleSeriesRef = useRef<any>(null)
 
   useEffect(() => {
     getETFList().then(list => {
@@ -105,6 +106,7 @@ export default function Detail() {
       wickDownColor: '#ef4147',
     })
     candleSeries.setData(candleData)
+    candleSeriesRef.current = candleSeries
 
     // Build close-price series for MA calculation
     const closeSeries = bars.map(bar => ({
@@ -171,6 +173,35 @@ export default function Detail() {
     }
   }, [renderChart])
 
+  // 回测结果 → K线图上标注买卖点
+  useEffect(() => {
+    const series = candleSeriesRef.current
+    if (!series || !backtestResult || backtestResult.trades.length === 0) return
+
+    const markers: any[] = []
+    for (const trade of backtestResult.trades) {
+      markers.push({
+        time: trade.buyDate,
+        position: 'belowBar',
+        color: '#3fb950',
+        shape: 'arrowUp',
+        text: '买',
+        size: 2,
+      })
+      if (trade.sellDate) {
+        markers.push({
+          time: trade.sellDate,
+          position: 'aboveBar',
+          color: '#f85149',
+          shape: 'arrowDown',
+          text: '卖',
+          size: 2,
+        })
+      }
+    }
+    series.setMarkers(markers)
+  }, [backtestResult])
+
   const handleAnalyze = async () => {
     if (!selectedETF) return
     const newSignals = await analyze([selectedETF])
@@ -236,7 +267,20 @@ export default function Detail() {
       )}
 
       {bars.length > 0 ? (
-        <div ref={chartContainerRef} className="chart-container" />
+        <>
+          <div ref={chartContainerRef} className="chart-container" />
+          <div className="ma-legend">
+            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#e5c73c'}} /> MA5</span>
+            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#58a6ff'}} /> MA20</span>
+            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#bc8cff'}} /> MA60</span>
+            {backtestResult && backtestResult.totalTrades > 0 && (
+              <>
+                <span className="ma-legend-item"><span className="ma-dot" style={{background:'var(--green)'}} /> 买点</span>
+                <span className="ma-legend-item"><span className="ma-dot" style={{background:'var(--red)'}} /> 卖点</span>
+              </>
+            )}
+          </div>
+        </>
       ) : (
         <div className="chart-placeholder">
           <p>{'\u{1F4C8}'} K线图区域</p>
