@@ -39,6 +39,9 @@ export default function Detail() {
 
   useEffect(() => {
     if (!selectedETF) return
+    setBars([])
+    setSignals([])
+    setBacktestResult(null)
     getKLines(selectedETF.code).then(setBars)
     getSignals({ etfCode: selectedETF.code, limit: 20 }).then(setSignals)
   }, [selectedETF])
@@ -255,9 +258,9 @@ export default function Detail() {
 
       {backtestResult && backtestResult.equityCurve.length > 0 && (
         <div className="backtest-results">
-          <h3 style={{ marginTop: 16, marginBottom: 4 }}>📊 回测结果</h3>
+          <h3 style={{ marginTop: 16, marginBottom: 4 }}>📊 回测结果 - {selectedETF?.name}</h3>
           <div className="backtest-period">
-            回测区间：{backtestResult.equityCurve[0].date} ~ {backtestResult.equityCurve[backtestResult.equityCurve.length - 1].date}
+            {selectedETF?.code}.{selectedETF?.market} · 回测区间：{backtestResult.equityCurve[0].date} ~ {backtestResult.equityCurve[backtestResult.equityCurve.length - 1].date}
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-metrics">
