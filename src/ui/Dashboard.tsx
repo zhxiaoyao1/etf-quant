@@ -5,7 +5,7 @@ import { useETFWorker } from '../hooks/useWorker'
 import { getETFList, saveETFList, getSignals } from '../data/db'
 import './Dashboard.css'
 
-export default function Dashboard({ mobile }: { mobile?: boolean }) {
+export default function Dashboard() {
   const [etfs, setEtfs] = useState<ETFInfo[]>([])
   const [signals, setSignals] = useState<Map<string, Signal>>(new Map())
   const { fetchAndStore, analyze, loading } = useETFWorker()
@@ -29,17 +29,6 @@ export default function Dashboard({ mobile }: { mobile?: boolean }) {
       }
       setSignals(map)
     })
-    // 手机端自动刷新数据
-    if (mobile) {
-      getETFList().then(list => {
-        const etfData = list.length > 0 ? list : DEFAULT_ETF_LIST
-        fetchAndStore(etfData).then(() => analyze(etfData).then(newSignals => {
-          const map = new Map<string, Signal>()
-          for (const s of newSignals) map.set(s.etfCode, s)
-          setSignals(map)
-        }))
-      })
-    }
   }, [])
 
   const handleRefresh = async () => {
@@ -60,8 +49,8 @@ export default function Dashboard({ mobile }: { mobile?: boolean }) {
 
   return (
     <div className="dashboard">
-      <div className={`dashboard-header${mobile ? ' mobile-header' : ''}`}>
-        <h2>{mobile ? 'ETF 量化信号' : '📊 看板'}</h2>
+      <div className="dashboard-header">
+        <h2>{'📊'} {'看板'}</h2>
         <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
           {loading ? '更新中...' : '🔄 刷新'}
         </button>
@@ -70,7 +59,7 @@ export default function Dashboard({ mobile }: { mobile?: boolean }) {
       {etfs.length === 0 && (
         <div className="empty-state">
           <p>{'暂无 ETF 关注列表'}</p>
-          {!mobile && <p className="sub">{'请在设置中添加'}</p>}
+          <p className="sub">{'请在设置中添加'}</p>
         </div>
       )}
 

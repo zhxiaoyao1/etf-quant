@@ -43,20 +43,3 @@
 .score-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 .empty-state { text-align: center; padding: 40px 0; color: var(--text-secondary); }
 .empty-state .sub { font-size: 13px; margin-top: 4px; }
-
-/* Mobile-specific: larger cards, auto-refresh on open */
-.mobile-header { margin-bottom: 20px; }
-.mobile-header h2 { font-size: 18px; }
-.mobile-header .refresh-btn { padding: 10px 20px; font-size: 16px; }
-
-.app-mobile .etf-card {
-  padding: 18px 16px;
-  border-radius: 12px;
-  margin-bottom: 4px;
-}
-.app-mobile .etf-name { font-size: 18px; }
-.app-mobile .etf-code { font-size: 13px; }
-.app-mobile .signal-emoji { font-size: 30px; }
-.app-mobile .signal-label { font-size: 12px; font-weight: 600; }
-.app-mobile .etf-score span { font-size: 26px !important; }
-.app-mobile .score-label { font-size: 12px; }

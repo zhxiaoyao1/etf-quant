@@ -23,11 +23,12 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { analyze, loading, backtest: workerBacktest, optimize: workerOptimize } = useETFWorker()
+  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
   const [btSell, setBtSell] = useState(40)
+  const [btError, setBtError] = useState('')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
@@ -205,9 +206,33 @@ export default function Detail() {
     series.setMarkers(markers)
   }, [backtestResult])
 
+  // 确保数据足够，不够就自动拉取
+  const ensureData = async (): Promise<boolean> => {
+    if (!selectedETF) return false
+    if (bars.length >= 80) return true
+    setBtError('K线数据不足，正在自动拉取...')
+    try {
+      await fetchAndStore([selectedETF])
+      const fresh = await getKLines(selectedETF.code)
+      setBars(fresh)
+      if (fresh.length < 80) {
+        setBtError(`数据不足：仅${fresh.length}天K线（需≥80天）。请先点上方「刷新」按钮拉取数据。`)
+        return false
+      }
+      setBtError('')
+      return true
+    } catch {
+      setBtError('数据拉取失败，请检查网络后重试')
+      return false
+    }
+  }
+
   const handleOptimize = async () => {
-    if (!selectedETF || bars.length < 80) return
+    if (!selectedETF) return
+    setBtError('')
     setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
     try {
       const opt = await workerOptimize(selectedETF.code)
       setBtBuy(opt.bestBuy)
@@ -216,8 +241,8 @@ export default function Detail() {
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
-    } catch (err) {
-      console.error('Optimize failed:', err)
+    } catch (err: any) {
+      setBtError(err?.message || '寻优失败，请重试')
     } finally {
       setBacktesting(false)
     }
@@ -232,16 +257,19 @@ export default function Detail() {
   }
 
   const handleBacktest = async () => {
-    if (!selectedETF || bars.length < 80) return
+    if (!selectedETF) return
+    setBtError('')
     setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
     try {
       const result = await workerBacktest(selectedETF.code, btBuy, btSell)
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
-    } catch (err) {
-      console.error('Backtest failed:', err)
+    } catch (err: any) {
+      setBtError(err?.message || '回测失败，请重试')
     } finally {
       setBacktesting(false)
     }
@@ -395,23 +423,21 @@ export default function Detail() {
         </div>
       </div>
 
-      {bars.length > 0 && bars.length < 80 && (
-        <div className="backtest-hint">
-          ⚠️ 回测需要至少80天K线数据（当前仅{bars.length}天），请先点「刷新」拉取数据
-        </div>
+      {btError && (
+        <div className="backtest-hint">{btError}</div>
       )}
       <div className="bt-buttons">
         <button
           className={`backtest-btn${backtesting ? ' loading' : ''}`}
           onClick={handleBacktest}
-          disabled={backtesting || bars.length < 80}
+          disabled={backtesting}
         >
-          {backtesting ? '⏳ 计算中...' : bars.length < 80 ? `📊 回测（需≥80天，当前${bars.length}）` : '📊 回测'}
+          {backtesting ? '⏳ 计算中...' : '📊 回测'}
         </button>
         <button
           className="optimize-btn"
           onClick={handleOptimize}
-          disabled={backtesting || bars.length < 80}
+          disabled={backtesting}
         >
           🤖 自动寻优
         </button>
