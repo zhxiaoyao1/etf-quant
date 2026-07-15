@@ -172,10 +172,16 @@ export default function Detail() {
   const handleBacktest = async () => {
     if (!selectedETF || bars.length < 80) return
     setBacktesting(true)
+    // 用 setTimeout 让 loading 状态先渲染，避免界面卡住
+    await new Promise(resolve => setTimeout(resolve, 50))
     try {
       const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
       const result = runBacktest(bars, weights)
       setBacktestResult(result)
+      // 滚动到回测结果
+      setTimeout(() => {
+        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
     } finally {
       setBacktesting(false)
     }
@@ -240,9 +246,13 @@ export default function Detail() {
         {signals.length === 0 && <div className="history-item"><span style={{color: 'var(--text-secondary)'}}>暂无信号记录</span></div>}
       </div>
 
-      {backtestResult && (
+      {backtestResult && backtestResult.equityCurve.length > 0 && (
         <div className="backtest-results">
-          <h3 style={{ marginTop: 16, marginBottom: 8 }}>回测结果</h3>
+          <h3 style={{ marginTop: 16, marginBottom: 4 }}>📊 回测结果</h3>
+          <div className="backtest-period">
+            回测区间：{backtestResult.equityCurve[0].date} ~ {backtestResult.equityCurve[backtestResult.equityCurve.length - 1].date}
+            · 共 {backtestResult.equityCurve.length} 个交易日
+          </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">
               <div className="metric-label">总收益率</div>
@@ -300,8 +310,17 @@ export default function Detail() {
         {loading ? '分析中...' : '\u{1F50D} 分析此ETF'}
       </button>
 
-      <button className="backtest-btn" onClick={handleBacktest} disabled={backtesting || bars.length < 80}>
-        {backtesting ? '回测中...' : '\u{1F4CA} 回测'}
+      {bars.length > 0 && bars.length < 80 && (
+        <div className="backtest-hint">
+          ⚠️ 回测需要至少80天K线数据（当前仅{bars.length}天），请先点「刷新」拉取数据
+        </div>
+      )}
+      <button
+        className={`backtest-btn${backtesting ? ' loading' : ''}`}
+        onClick={handleBacktest}
+        disabled={backtesting || bars.length < 80}
+      >
+        {backtesting ? '⏳ 回测计算中...' : bars.length < 80 ? `📊 回测（需≥80天，当前${bars.length}）` : '📊 回测'}
       </button>
     </div>
   )

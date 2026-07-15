@@ -88,7 +88,22 @@
   font-size: 15px;
   cursor: pointer;
 }
-.backtest-btn:disabled { opacity: 0.5; }
+.backtest-btn:disabled { opacity: 0.4; }
+.backtest-btn.loading { opacity: 0.7; }
+.backtest-hint {
+  color: var(--yellow);
+  background: #332a0d;
+  border: 1px solid #4d401a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.backtest-period {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
 .backtest-results {
   margin-bottom: 12px;
 }
