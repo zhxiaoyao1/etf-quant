@@ -32,12 +32,28 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         const savedSell = await getSetting<number>('sellThreshold')
         const effective = thresholds ?? ((savedBuy && savedSell) ? { buyThreshold: savedBuy, sellThreshold: savedSell } : DEFAULT_SIGNAL_THRESHOLDS)
         const result = scoreETF(bars, weights, effective)
+
+        // MA5 趋势过滤：信号方向必须与价格趋势一致
+        let finalSignal = result.signal
+        if (bars.length >= 8) {
+          const last5 = bars.slice(-5)
+          const prev5 = bars.slice(-8, -3)
+          const ma5Now = last5.reduce((s, b) => s + b.close, 0) / 5
+          const ma5Prev = prev5.reduce((s, b) => s + b.close, 0) / 5
+          const trendUp = ma5Now > ma5Prev
+          const trendDown = ma5Now < ma5Prev
+          // 买入信号但价格在跌 → 降级为观望
+          if (result.signal === 'buy' && !trendUp) finalSignal = 'hold'
+          // 卖出信号但价格在涨 → 降级为观望
+          if (result.signal === 'sell' && !trendDown) finalSignal = 'hold'
+        }
+
         const signal: Signal = {
           id: `etf-${etf.code}-${new Date().toISOString().slice(0, 10)}`,
           etfCode: etf.code,
           date: new Date().toISOString().slice(0, 10),
           compositeScore: result.compositeScore,
-          signal: result.signal,
+          signal: finalSignal,
           factorScores: result.factorScores,
           weights: result.weights,
         }
