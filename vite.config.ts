@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -36,7 +37,10 @@ export default defineConfig({
       }
     })
   ],
-  worker: {
-    format: 'es'
-  }
+  worker: { format: 'es' },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './tests/setup.ts',
+  },
 })
