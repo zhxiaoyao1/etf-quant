@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react'
 import type { ETFInfo, Signal } from '../types'
 import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
 import { useETFWorker } from '../hooks/useWorker'
-import { getETFList, saveETFList, getSignals, getKLines } from '../data/db'
+import { getETFList, saveETFList, getSignals, getKLines, getSetting, getWeights } from '../data/db'
 import { scoreETF } from '../engine/etf/scorer'
-import { getWeights } from '../data/db'
 import './Dashboard.css'
 
 interface ScorePoint { date: string; score: number; signal: string }
@@ -46,9 +45,12 @@ export default function Dashboard() {
       return
     }
     const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
+    const savedBuy = await getSetting<number>('buyThreshold')
+    const savedSell = await getSetting<number>('sellThreshold')
+    const thresholds = (savedBuy && savedSell) ? { buyThreshold: savedBuy, sellThreshold: savedSell } : undefined
     const points: ScorePoint[] = []
     for (let i = bars.length - 1; i >= Math.max(60, bars.length - 10); i--) {
-      const result = scoreETF(bars.slice(0, i + 1), weights)
+      const result = scoreETF(bars.slice(0, i + 1), weights, thresholds)
       points.push({ date: bars[i].date, score: result.compositeScore, signal: result.signal })
     }
     setRecentScores(points)
