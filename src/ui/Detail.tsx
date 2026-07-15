@@ -259,11 +259,9 @@ export default function Detail() {
       setBtBuy(opt.bestBuy)
       setBtSell(opt.bestSell)
       setBacktestResult(opt.result)
-      // 保存优化结果：权重 + 阈值
-      const { saveWeights, saveSetting } = await import('../data/db')
+      // 保存优化后的权重
+      const { saveWeights } = await import('../data/db')
       await saveWeights('etf', opt.bestWeights)
-      await saveSetting('buyThreshold', opt.bestBuy)
-      await saveSetting('sellThreshold', opt.bestSell)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
