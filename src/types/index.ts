@@ -79,3 +79,43 @@ export interface LearningConfig {
   weightMin: number // 默认 0.10
   weightMax: number // 默认 0.50
 }
+
+/** 场外基金基本信息 */
+export interface FundInfo {
+  code: string
+  name: string
+  type: string
+  inPortfolio: boolean
+  holdAmount?: number
+  holdDate?: string
+}
+
+/** 场外基金净值数据 */
+export interface FundNAV {
+  date: string
+  nav: number
+  accumulatedNav: number
+  dailyReturn: number
+}
+
+/** 场外基金选基信号 */
+export interface FundScreeningSignal {
+  id: string
+  fundCode: string
+  date: string
+  compositeScore: number
+  signal: 'buy' | 'hold' | 'sell'
+  factorScores: FactorScore[]
+  weights: Record<string, number>
+}
+
+/** 场外基金诊断信号 */
+export interface FundDiagnosisSignal {
+  id: string
+  fundCode: string
+  date: string
+  healthScore: number
+  signal: 'buy' | 'hold' | 'sell'
+  dimensionScores: FactorScore[]
+  alerts: string[]
+}

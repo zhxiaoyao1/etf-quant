@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import Dashboard from './ui/Dashboard'
 import Detail from './ui/Detail'
+import Factors from './ui/Factors'
 import Settings from './ui/Settings'
 
 type Tab = 'dashboard' | 'detail' | 'fundpicker' | 'factors' | 'settings'
@@ -23,7 +24,7 @@ function App() {
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'detail' && <Detail />}
         {activeTab === 'fundpicker' && <div>选基</div>}
-        {activeTab === 'factors' && <div>因子</div>}
+        {activeTab === 'factors' && <Factors />}
         {activeTab === 'settings' && <Settings />}
       </div>
       <nav className="nav">
