@@ -219,8 +219,8 @@ export function optimizeThresholds(
   let bestScore = -Infinity
   let tested = 0
 
-  for (let buy = 55; buy <= 85; buy += 5) {
-    for (let sell = 25; sell <= 45; sell += 5) {
+  for (let buy = 40; buy <= 90; buy += 5) {
+    for (let sell = 15; sell <= 55; sell += 5) {
       tested++
       const result = runBacktest(bars, weights, { buyThreshold: buy, sellThreshold: sell })
       // 评分：优先回报率，但要求至少3笔交易才有统计意义

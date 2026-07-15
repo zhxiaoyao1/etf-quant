@@ -445,11 +445,11 @@ export default function Detail() {
       <div className="backtest-controls">
         <div className="bt-threshold-row">
           <label className="bt-label">买入阈值: <span style={{color:'var(--green)'}}>{btBuy}</span></label>
-          <input type="range" min={50} max={90} value={btBuy} onChange={e => setBtBuy(Number(e.target.value))} className="bt-slider" />
+          <input type="range" min={30} max={95} value={btBuy} onChange={e => setBtBuy(Number(e.target.value))} className="bt-slider" />
         </div>
         <div className="bt-threshold-row">
           <label className="bt-label">卖出阈值: <span style={{color:'var(--red)'}}>{btSell}</span></label>
-          <input type="range" min={20} max={55} value={btSell} onChange={e => setBtSell(Number(e.target.value))} className="bt-slider" />
+          <input type="range" min={10} max={60} value={btSell} onChange={e => setBtSell(Number(e.target.value))} className="bt-slider" />
         </div>
       </div>
 
