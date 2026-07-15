@@ -1,6 +1,7 @@
 import type { Signal, ETFInfo, SignalThresholds, LearningConfig, LearningLog } from '../types'
 import { scoreETF } from '../engine/etf/scorer'
 import { adjustWeights } from '../engine/etf/learner'
+import { runBacktest, optimizeThresholds } from '../engine/etf/backtest'
 import { fetchAllETFs } from '../data/etfFetcher'
 import { getKLines, saveKLines, saveSignal, getSignals, getWeights, saveWeights, saveLearningLog } from '../data/db'
 import { DEFAULT_ETF_WEIGHTS, DEFAULT_SIGNAL_THRESHOLDS, DEFAULT_LEARNING_CONFIG } from '../config/defaults'
@@ -9,6 +10,8 @@ type WorkerMessage =
   | { type: 'analyze'; etfs: ETFInfo[]; thresholds?: SignalThresholds }
   | { type: 'learn'; etfCode: string; config?: LearningConfig }
   | { type: 'fetchAndStore'; etfs: ETFInfo[] }
+  | { type: 'backtest'; etfCode: string; buyThreshold: number; sellThreshold: number }
+  | { type: 'optimize'; etfCode: string }
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const msg = e.data
@@ -38,6 +41,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         signals.push(signal)
       }
       self.postMessage({ type: 'analysisComplete', signals })
+
     } else if (msg.type === 'learn') {
       const { etfCode, config } = msg
       const cfg = config ?? DEFAULT_LEARNING_CONFIG
@@ -66,6 +70,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       }
       await saveLearningLog(log)
       self.postMessage({ type: 'learnComplete', log })
+
     } else if (msg.type === 'fetchAndStore') {
       const { etfs } = msg
       const data = await fetchAllETFs(etfs)
@@ -77,7 +82,30 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
       }
       self.postMessage({ type: 'fetchComplete', count })
+
+    } else if (msg.type === 'backtest') {
+      const { etfCode, buyThreshold, sellThreshold } = msg
+      const bars = await getKLines(etfCode)
+      if (bars.length < 80) {
+        self.postMessage({ type: 'error', message: `需要至少80天K线数据，当前${bars.length}天` })
+        return
+      }
+      const weights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
+      const result = runBacktest(bars, weights, { buyThreshold, sellThreshold })
+      self.postMessage({ type: 'backtestResult', result })
+
+    } else if (msg.type === 'optimize') {
+      const { etfCode } = msg
+      const bars = await getKLines(etfCode)
+      if (bars.length < 80) {
+        self.postMessage({ type: 'error', message: `需要至少80天K线数据，当前${bars.length}天` })
+        return
+      }
+      const weights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
+      const opt = optimizeThresholds(bars, weights)
+      self.postMessage({ type: 'optimizeResult', bestBuy: opt.bestBuy, bestSell: opt.bestSell, result: opt.bestResult })
     }
+
   } catch (err) {
     self.postMessage({
       type: 'error',

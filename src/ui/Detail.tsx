@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
-import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
-import { getETFList, getKLines, getSignals, getWeights } from '../data/db'
-import { runBacktest, optimizeThresholds, type BacktestResult } from '../engine/etf/backtest'
+import { DEFAULT_ETF_LIST } from '../config/defaults'
+import { getETFList, getKLines, getSignals } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import './Detail.css'
 
@@ -24,8 +23,8 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { analyze, loading } = useETFWorker()
-  const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null)
+  const { analyze, loading, backtest: workerBacktest, optimize: workerOptimize } = useETFWorker()
+  const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
   const [btSell, setBtSell] = useState(40)
@@ -209,16 +208,16 @@ export default function Detail() {
   const handleOptimize = async () => {
     if (!selectedETF || bars.length < 80) return
     setBacktesting(true)
-    await new Promise(resolve => setTimeout(resolve, 50))
     try {
-      const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
-      const opt = optimizeThresholds(bars, weights)
+      const opt = await workerOptimize(selectedETF.code)
       setBtBuy(opt.bestBuy)
       setBtSell(opt.bestSell)
-      setBacktestResult(opt.bestResult)
+      setBacktestResult(opt.result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
+    } catch (err) {
+      console.error('Optimize failed:', err)
     } finally {
       setBacktesting(false)
     }
@@ -235,16 +234,14 @@ export default function Detail() {
   const handleBacktest = async () => {
     if (!selectedETF || bars.length < 80) return
     setBacktesting(true)
-    // 用 setTimeout 让 loading 状态先渲染，避免界面卡住
-    await new Promise(resolve => setTimeout(resolve, 50))
     try {
-      const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
-      const result = runBacktest(bars, weights, { buyThreshold: btBuy, sellThreshold: btSell })
+      const result = await workerBacktest(selectedETF.code, btBuy, btSell)
       setBacktestResult(result)
-      // 滚动到回测结果
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
+    } catch (err) {
+      console.error('Backtest failed:', err)
     } finally {
       setBacktesting(false)
     }
