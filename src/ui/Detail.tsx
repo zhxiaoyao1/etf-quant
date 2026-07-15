@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
-import { DEFAULT_ETF_LIST } from '../config/defaults'
-import { getETFList, getKLines, getSignals } from '../data/db'
+import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
+import { getETFList, getKLines, getSignals, getWeights } from '../data/db'
+import { runBacktest, type BacktestResult } from '../engine/etf/backtest'
 import { useETFWorker } from '../hooks/useWorker'
 import './Detail.css'
 
@@ -24,6 +25,8 @@ export default function Detail() {
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
   const { analyze, loading } = useETFWorker()
+  const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null)
+  const [backtesting, setBacktesting] = useState(false)
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
@@ -166,6 +169,18 @@ export default function Detail() {
     }
   }
 
+  const handleBacktest = async () => {
+    if (!selectedETF || bars.length < 80) return
+    setBacktesting(true)
+    try {
+      const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
+      const result = runBacktest(bars, weights)
+      setBacktestResult(result)
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
   const latestSignal = signals[0]
   const signalEmoji = (s: string) => s === 'buy' ? '\u{1F7E2}' : s === 'sell' ? '\u{1F534}' : '\u{1F7E1}'
 
@@ -225,8 +240,68 @@ export default function Detail() {
         {signals.length === 0 && <div className="history-item"><span style={{color: 'var(--text-secondary)'}}>暂无信号记录</span></div>}
       </div>
 
+      {backtestResult && (
+        <div className="backtest-results">
+          <h3 style={{ marginTop: 16, marginBottom: 8 }}>回测结果</h3>
+          <div className="backtest-metrics">
+            <div className="backtest-metric">
+              <div className="metric-label">总收益率</div>
+              <div className="metric-value" style={{ color: backtestResult.totalReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {(backtestResult.totalReturn * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className="backtest-metric">
+              <div className="metric-label">年化收益</div>
+              <div className="metric-value" style={{ color: backtestResult.annualizedReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {(backtestResult.annualizedReturn * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className="backtest-metric">
+              <div className="metric-label">最大回撤</div>
+              <div className="metric-value" style={{ color: 'var(--red)' }}>
+                {(backtestResult.maxDrawdown * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className="backtest-metric">
+              <div className="metric-label">夏普比率</div>
+              <div className="metric-value" style={{ color: backtestResult.sharpeRatio >= 1 ? 'var(--green)' : backtestResult.sharpeRatio >= 0 ? 'var(--yellow)' : 'var(--red)' }}>
+                {backtestResult.sharpeRatio.toFixed(2)}
+              </div>
+            </div>
+            <div className="backtest-metric">
+              <div className="metric-label">胜率</div>
+              <div className="metric-value" style={{ color: backtestResult.winRate >= 0.5 ? 'var(--green)' : 'var(--red)' }}>
+                {(backtestResult.winRate * 100).toFixed(1)}%
+              </div>
+            </div>
+            <div className="backtest-metric">
+              <div className="metric-label">交易次数</div>
+              <div className="metric-value">{backtestResult.totalTrades}</div>
+            </div>
+          </div>
+          <div className="backtest-comparison">
+            <div className="comparison-row">
+              <span>策略收益</span>
+              <span style={{ color: backtestResult.totalReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {(backtestResult.totalReturn * 100).toFixed(2)}%
+              </span>
+            </div>
+            <div className="comparison-row">
+              <span>买入持有</span>
+              <span style={{ color: backtestResult.buyAndHoldReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {(backtestResult.buyAndHoldReturn * 100).toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button className="analyze-btn" onClick={handleAnalyze} disabled={loading}>
         {loading ? '分析中...' : '\u{1F50D} 分析此ETF'}
+      </button>
+
+      <button className="backtest-btn" onClick={handleBacktest} disabled={backtesting || bars.length < 80}>
+        {backtesting ? '回测中...' : '\u{1F4CA} 回测'}
       </button>
     </div>
   )
