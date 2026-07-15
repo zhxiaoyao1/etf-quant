@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import Dashboard from './ui/Dashboard'
 
 type Tab = 'dashboard' | 'detail' | 'fundpicker' | 'factors' | 'settings'
 
@@ -17,7 +18,7 @@ function App() {
   return (
     <div className="app">
       <div className="app-content">
-        {activeTab === 'dashboard' && <div>看板</div>}
+        {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'detail' && <div>详情</div>}
         {activeTab === 'fundpicker' && <div>选基</div>}
         {activeTab === 'factors' && <div>因子</div>}
