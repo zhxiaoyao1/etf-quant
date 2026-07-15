@@ -52,13 +52,16 @@ export function runBacktest(
   let buyDate = ''
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
-  const startIdx = 61  // Need at least 60 bars + 1 previous day for crossover
+  const TREND_WINDOW = 8  // 趋势判断窗口
+  const startIdx = 61
+  const scoreHistory: number[] = []
   let prevScore = 50
 
-  // 初始化前一天的分数
+  // 初始化前60天的分数
   if (bars.length > 60) {
     const initResult = scoreETF(bars.slice(0, 60), weights, thresholds)
     prevScore = initResult.compositeScore
+    scoreHistory.push(initResult.compositeScore)
   }
 
   for (let i = startIdx; i < bars.length - 1; i++) {
@@ -66,13 +69,25 @@ export function runBacktest(
     const result = scoreETF(windowBars, weights, thresholds)
     const currentScore = result.compositeScore
     const currentPrice = bars[i].close
+    scoreHistory.push(currentScore)
 
-    // 买入：分数从下方穿越买入线（从小变大）
+    // 计算分数趋势：最近 TREND_WINDOW 天是涨还是跌
+    const trendScores = scoreHistory.slice(-TREND_WINDOW)
+    const trendSlope = trendScores.length >= 5
+      ? trendScores[trendScores.length - 1] - trendScores[0]
+      : 0
+    const scoreTrending = trendSlope > 2   // 上升趋势
+    const scoreFalling = trendSlope < -2    // 下降趋势
+
+    // 买入：分数穿越买入线 + 趋势向上（分数在涨，不是假突破）
     const crossedBuy = prevScore < thresholds.buyThreshold && currentScore >= thresholds.buyThreshold
-    // 卖出：分数从上方穿越卖出线（从大变小）
-    const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
+    const validBuy = crossedBuy && scoreTrending
 
-    if (!holding && crossedBuy) {
+    // 卖出：分数穿越卖出线 + 趋势向下（分数在跌，不是假跌破）
+    const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
+    const validSell = crossedSell && scoreFalling
+
+    if (!holding && validBuy) {
       const nextOpen = bars[i + 1].open
       shares = cash / nextOpen
       cash = 0
@@ -80,7 +95,7 @@ export function runBacktest(
       buyPrice = nextOpen
       buyDate = bars[i + 1].date
     }
-    else if (holding && crossedSell) {
+    else if (holding && validSell) {
       // Sell at next day's open
       const nextOpen = bars[i + 1].open
       cash = shares * nextOpen
