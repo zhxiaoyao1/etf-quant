@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import './App.css'
 import Dashboard from './ui/Dashboard'
+import Detail from './ui/Detail'
+import Settings from './ui/Settings'
 
 type Tab = 'dashboard' | 'detail' | 'fundpicker' | 'factors' | 'settings'
 
@@ -19,10 +21,10 @@ function App() {
     <div className="app">
       <div className="app-content">
         {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'detail' && <div>详情</div>}
+        {activeTab === 'detail' && <Detail />}
         {activeTab === 'fundpicker' && <div>选基</div>}
         {activeTab === 'factors' && <div>因子</div>}
-        {activeTab === 'settings' && <div>设置</div>}
+        {activeTab === 'settings' && <Settings />}
       </div>
       <nav className="nav">
         {tabs.map(tab => (
