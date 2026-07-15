@@ -27,6 +27,8 @@ export default function Detail() {
   const { analyze, loading } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null)
   const [backtesting, setBacktesting] = useState(false)
+  const [btBuy, setBtBuy] = useState(70)
+  const [btSell, setBtSell] = useState(40)
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
@@ -219,7 +221,7 @@ export default function Detail() {
     await new Promise(resolve => setTimeout(resolve, 50))
     try {
       const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
-      const result = runBacktest(bars, weights)
+      const result = runBacktest(bars, weights, { buyThreshold: btBuy, sellThreshold: btSell })
       setBacktestResult(result)
       // 滚动到回测结果
       setTimeout(() => {
@@ -307,7 +309,7 @@ export default function Detail() {
           <h3 style={{ marginTop: 16, marginBottom: 4 }}>📊 回测结果 - {selectedETF?.name}</h3>
           <div className="backtest-period">
             {selectedETF?.code}.{selectedETF?.market} · 回测区间：{backtestResult.equityCurve[0].date} ~ {backtestResult.equityCurve[backtestResult.equityCurve.length - 1].date}
-            · 共 {backtestResult.equityCurve.length} 个交易日
+            · 共 {backtestResult.equityCurve.length} 个交易日 · 买入≥{btBuy} 卖出&lt;{btSell}
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">
@@ -365,6 +367,18 @@ export default function Detail() {
       <button className="analyze-btn" onClick={handleAnalyze} disabled={loading}>
         {loading ? '分析中...' : '\u{1F50D} 分析此ETF'}
       </button>
+
+      {/* 回测阈值调节 */}
+      <div className="backtest-controls">
+        <div className="bt-threshold-row">
+          <label className="bt-label">买入阈值: <span style={{color:'var(--green)'}}>{btBuy}</span></label>
+          <input type="range" min={50} max={90} value={btBuy} onChange={e => setBtBuy(Number(e.target.value))} className="bt-slider" />
+        </div>
+        <div className="bt-threshold-row">
+          <label className="bt-label">卖出阈值: <span style={{color:'var(--red)'}}>{btSell}</span></label>
+          <input type="range" min={20} max={55} value={btSell} onChange={e => setBtSell(Number(e.target.value))} className="bt-slider" />
+        </div>
+      </div>
 
       {bars.length > 0 && bars.length < 80 && (
         <div className="backtest-hint">
