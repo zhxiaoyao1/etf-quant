@@ -7,6 +7,7 @@
   --green: #3fb950;
   --yellow: #d2991d;
   --red: #f85149;
+  --app-max-width: 480px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -23,7 +24,7 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 480px;
+  max-width: var(--app-max-width);
   margin: 0 auto;
 }
 
@@ -32,4 +33,39 @@ html, body, #root {
   overflow-y: auto;
   padding: 16px;
   padding-bottom: 70px;
+}
+
+.nav {
+  display: flex;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  z-index: 100;
+}
+
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.nav-btn.active {
+  background: #1a2332;
+  color: var(--text-primary);
+}
+
+.nav-icon {
+  font-size: 20px;
 }

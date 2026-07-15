@@ -23,36 +23,14 @@ function App() {
         {activeTab === 'factors' && <div>因子</div>}
         {activeTab === 'settings' && <div>设置</div>}
       </div>
-      <nav style={{
-        display: 'flex',
-        background: 'var(--bg-card)',
-        borderTop: '1px solid var(--border)',
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        maxWidth: 480,
-        margin: '0 auto',
-        zIndex: 100,
-      }}>
+      <nav className="nav">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '8px 4px',
-              background: activeTab === tab.key ? '#1a2332' : 'transparent',
-              border: 'none',
-              color: activeTab === tab.key ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontSize: 10,
-              cursor: 'pointer',
-            }}
+            className={`nav-btn${activeTab === tab.key ? ' active' : ''}`}
           >
-            <span style={{ fontSize: 20 }}>{tab.icon}</span>
+            <span className="nav-icon">{tab.icon}</span>
             <span>{tab.label}</span>
           </button>
         ))}
