@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import type { ETFInfo, Signal } from '../types'
-import { DEFAULT_ETF_LIST } from '../config/defaults'
+import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
 import { useETFWorker } from '../hooks/useWorker'
-import { getETFList, saveETFList, getSignals } from '../data/db'
+import { getETFList, saveETFList, getSignals, getKLines } from '../data/db'
+import { scoreETF } from '../engine/etf/scorer'
+import { getWeights } from '../data/db'
 import './Dashboard.css'
+
+interface ScorePoint { date: string; score: number; signal: string }
 
 export default function Dashboard() {
   const [etfs, setEtfs] = useState<ETFInfo[]>([])
   const [signals, setSignals] = useState<Map<string, Signal>>(new Map())
   const [modalETF, setModalETF] = useState<ETFInfo | null>(null)
-  const [recentScores, setRecentScores] = useState<Signal[]>([])
+  const [recentScores, setRecentScores] = useState<ScorePoint[]>([])
   const { fetchAndStore, analyze, loading } = useETFWorker()
 
   useEffect(() => {
@@ -35,8 +39,19 @@ export default function Dashboard() {
 
   const handleCardClick = async (etf: ETFInfo) => {
     setModalETF(etf)
-    const sigs = await getSignals({ etfCode: etf.code, limit: 10 })
-    setRecentScores(sigs)
+    // 从K线数据实时计算近十日评分
+    const bars = await getKLines(etf.code)
+    if (bars.length < 70) {
+      setRecentScores([])
+      return
+    }
+    const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
+    const points: ScorePoint[] = []
+    for (let i = bars.length - 1; i >= Math.max(60, bars.length - 10); i--) {
+      const result = scoreETF(bars.slice(0, i + 1), weights)
+      points.push({ date: bars[i].date, score: result.compositeScore, signal: result.signal })
+    }
+    setRecentScores(points)
   }
 
   const handleRefresh = async () => {
@@ -110,19 +125,19 @@ export default function Dashboard() {
             </div>
             <div className="score-list">
               {recentScores.length === 0 ? (
-                <p className="score-empty">暂无评分记录，请先点刷新</p>
+                <p className="score-empty">K线数据不足（需≥70天），请先点刷新拉取数据</p>
               ) : (
                 recentScores.map((s, i) => (
-                  <div key={s.id} className="score-row">
+                  <div key={s.date} className="score-row">
                     <span className="score-date">{s.date}</span>
                     <span className="score-trend">
                       {i < recentScores.length - 1 && (
-                        s.compositeScore > recentScores[i + 1].compositeScore ? '↑' :
-                        s.compositeScore < recentScores[i + 1].compositeScore ? '↓' : '→'
+                        s.score > recentScores[i + 1].score ? '↑' :
+                        s.score < recentScores[i + 1].score ? '↓' : '→'
                       )}
                     </span>
                     <span className="score-emoji">{signalEmoji(s.signal)}</span>
-                    <span className="score-num" style={{ color: scoreColor(s.signal) }}>{s.compositeScore}</span>
+                    <span className="score-num" style={{ color: scoreColor(s.signal) }}>{s.score}</span>
                   </div>
                 ))
               )}
