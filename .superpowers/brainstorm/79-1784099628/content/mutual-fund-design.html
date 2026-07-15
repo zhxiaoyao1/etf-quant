@@ -1,0 +1,149 @@
+<h2>加入场外基金分析 — 双引擎架构</h2>
+<p class="subtitle">场内 ETF（技术面）+ 场外基金（基本面）= 完整量化体系</p>
+
+<div class="section">
+  <h3>🔀 双引擎架构</h3>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:250px;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;">
+      <h4 style="color:#3fb950;margin-top:0;">📈 场内 ETF 引擎</h4>
+      <div style="color:#c9d1d9;font-size:13px;">
+        <strong>数据：</strong>日 K 线（OHLCV）<br>
+        <strong>方法：</strong>技术指标（均线/RSI/布林带…）<br>
+        <strong>输出：</strong>择时信号（买/持/卖）<br>
+        <strong>频率：</strong>每日<br>
+        <strong>因子：</strong>趋势 · 动量 · 波动率 · 资金流
+      </div>
+    </div>
+    <div style="flex:1;min-width:250px;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;">
+      <h4 style="color:#58a6ff;margin-top:0;">🏦 场外基金引擎（新增）</h4>
+      <div style="color:#c9d1d9;font-size:13px;">
+        <strong>数据：</strong>每日净值 + 季报数据<br>
+        <strong>方法：</strong>多维度基本面对比<br>
+        <strong>输出：</strong>筛选评分 + 持仓诊断<br>
+        <strong>频率：</strong>每周<br>
+        <strong>因子：</strong>收益 · 风控 · 性价比 · 经理 · 基本面
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🏦 场外基金 — 两套分析场景</h3>
+
+  <div class="mockup" style="margin-bottom:16px;">
+    <div class="mockup-header" style="color:#e6edf3;">场景一：基金筛选（从几千只里选好基）</div>
+    <div class="mockup-body" style="padding:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr style="border-bottom:1px solid #30363d;">
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">因子</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">核心指标</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">说明</th>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">收益能力</td>
+          <td style="padding:8px;color:#c9d1d9;">近1/3/6月·1/3年收益<br>超额收益(vs基准)</td>
+          <td style="padding:8px;color:#8b949e;">不同时间维度验证收益稳定性</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">风险控制</td>
+          <td style="padding:8px;color:#c9d1d9;">最大回撤 · 波动率<br>下行标准差</td>
+          <td style="padding:8px;color:#8b949e;">跌的时候跌多少、多剧烈</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">风险调整收益</td>
+          <td style="padding:8px;color:#c9d1d9;">夏普比率 · 索提诺比率<br>卡玛比率 · 信息比率</td>
+          <td style="padding:8px;color:#8b949e;">每单位风险换来了多少收益</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">经理质量</td>
+          <td style="padding:8px;color:#c9d1d9;">任职年限 · 管理规模<br>任职回报 · 获奖记录</td>
+          <td style="padding:8px;color:#8b949e;">人靠不靠谱</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#f0f6fc;">基金基本面</td>
+          <td style="padding:8px;color:#c9d1d9;">规模 · 费率 · 成立年限<br>持有人结构</td>
+          <td style="padding:8px;color:#8b949e;">盘子大不大、贵不贵</td>
+        </tr>
+      </table>
+      <div style="text-align:center;margin-top:12px;">
+        <span class="mock-button">加权综合评分 → 排序 → TOP 基金列表</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header" style="color:#e6edf3;">场景二：持仓诊断（我持有的基金该不该动）</div>
+    <div class="mockup-body" style="padding:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr style="border-bottom:1px solid #30363d;">
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">诊断维度</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">检查项</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">触发提醒条件</th>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">相对表现</td>
+          <td style="padding:8px;color:#c9d1d9;">vs 同类平均 · vs 基准指数</td>
+          <td style="padding:8px;color:#f85149;">连续3个月跑输同类后50%</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">风险异动</td>
+          <td style="padding:8px;color:#c9d1d9;">当前回撤 · 波动率突变</td>
+          <td style="padding:8px;color:#f85149;">回撤超过历史最大回撤80%</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">经理变动</td>
+          <td style="padding:8px;color:#c9d1d9;">是否换人 · 是否一拖多</td>
+          <td style="padding:8px;color:#f85149;">经理变更 / 同时管理>5只</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">风格漂移</td>
+          <td style="padding:8px;color:#c9d1d9;">基金风格 vs 名义风格</td>
+          <td style="padding:8px;color:#f85149;">持仓偏离名义风格>30%</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#f0f6fc;">规模健康</td>
+          <td style="padding:8px;color:#c9d1d9;">规模变化 · 大额申赎</td>
+          <td style="padding:8px;color:#f85149;">单季度规模翻倍/腰斩</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🧠 场外基金的自学习</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding:12px;">
+      <p style="color:#c9d1d9;font-size:13px;">
+        <strong>筛选验证：</strong>每月回看，上次筛选出的 TOP10 基金在下个季度实际表现是否跑赢同类平均？据此调整五个筛选因子的权重。
+      </p>
+      <p style="color:#c9d1d9;font-size:13px;">
+        <strong>诊断验证：</strong>系统提示"建议换基"后，该基金接下来 3 个月是否确实持续走弱？如果诊断不准，调整诊断触发条件的阈值。
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>📱 UI 变化</h3>
+  <div style="display:flex;gap:0;background:#0d1117;border-radius:8px;overflow:hidden;margin-top:8px;">
+    <div class="placeholder" style="flex:1;border-radius:0;text-align:center;">📊 看板</div>
+    <div class="placeholder" style="flex:1;border-radius:0;text-align:center;">🔍 详情</div>
+    <div class="placeholder" style="flex:1;border-radius:0;text-align:center;background:#1a2332;color:#58a6ff;">🏦 选基</div>
+    <div class="placeholder" style="flex:1;border-radius:0;text-align:center;">🧠 因子</div>
+    <div class="placeholder" style="flex:1;border-radius:0;text-align:center;">⚙️ 设置</div>
+  </div>
+  <p style="font-size:12px;color:#8b949e;margin-top:6px;">
+    💡 底部导航新增「选基」Tab，场外基金筛选 + 持仓诊断均在此入口
+  </p>
+</div>
+
+<div class="section">
+  <h3>📡 新增数据源</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="placeholder" style="flex:1;min-width:140px;">天天基金 API<br><small>净值·排名·经理</small></div>
+    <div class="placeholder" style="flex:1;min-width:140px;">好买基金<br><small>评级·分析</small></div>
+    <div class="placeholder" style="flex:1;min-width:140px;">AKShare 基金模块<br><small>基金数据接口</small></div>
+    <div class="placeholder" style="flex:1;min-width:140px;">季报爬取<br><small>持仓·规模·风格</small></div>
+  </div>
+</div>

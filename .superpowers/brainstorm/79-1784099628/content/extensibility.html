@@ -1,0 +1,82 @@
+<h2>可修改性设计</h2>
+<p class="subtitle">不碰代码也能调 · 碰代码也很简单</p>
+
+<div class="section">
+  <h3>🔧 无需改代码，设置页面直接调</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr style="border-bottom:1px solid #30363d;">
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">可调项</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">说明</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">默认值</th>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;"><td style="padding:8px;color:#f0f6fc;">均线周期</td><td style="padding:8px;color:#c9d1d9;">MA 快线/慢线天数</td><td style="padding:8px;color:#8b949e;">5 / 20 / 60</td></tr>
+        <tr style="border-bottom:1px solid #21262d;"><td style="padding:8px;color:#f0f6fc;">RSI 周期 & 阈值</td><td style="padding:8px;color:#c9d1d9;">计算周期 / 超买超卖线</td><td style="padding:8px;color:#8b949e;">14天 / 70-30</td></tr>
+        <tr style="border-bottom:1px solid #21262d;"><td style="padding:8px;color:#f0f6fc;">信号阈值</td><td style="padding:8px;color:#c9d1d9;">买入/观望/卖出分界线</td><td style="padding:8px;color:#8b949e;">70 / 40</td></tr>
+        <tr style="border-bottom:1px solid #21262d;"><td style="padding:8px;color:#f0f6fc;">学习率</td><td style="padding:8px;color:#c9d1d9;">权重平滑系数（0-1）</td><td style="padding:8px;color:#8b949e;">0.3</td></tr>
+        <tr style="border-bottom:1px solid #21262d;"><td style="padding:8px;color:#f0f6fc;">回看窗口</td><td style="padding:8px;color:#c9d1d9;">自学习评估用多少条历史信号</td><td style="padding:8px;color:#8b949e;">20条</td></tr>
+        <tr style="border-bottom:1px solid #21262d;"><td style="padding:8px;color:#f0f6fc;">因子权重锁</td><td style="padding:8px;color:#c9d1d9;">锁定某个因子的权重，不让系统自动调</td><td style="padding:8px;color:#8b949e;">全部解锁</td></tr>
+        <tr style="border-bottom:1px solid #21262d;"><td style="padding:8px;color:#f0f6fc;">权重上下限</td><td style="padding:8px;color:#c9d1d9;">每个因子权重的最低/最高值</td><td style="padding:8px;color:#8b949e;">10% / 50%</td></tr>
+        <tr><td style="padding:8px;color:#f0f6fc;">ETF 关注列表</td><td style="padding:8px;color:#c9d1d9;">增删关注的 ETF 代码</td><td style="padding:8px;color:#8b949e;">自选</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🧩 代码层面：改得动、加得上</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="placeholder" style="flex:1;min-width:180px;">
+      <strong>因子即插件</strong><br>
+      <small>每个因子是独立文件<br>新增因子 = 新建一个文件<br>注册到因子列表即可</small>
+    </div>
+    <div class="placeholder" style="flex:1;min-width:180px;">
+      <strong>配置与逻辑分离</strong><br>
+      <small>所有可调参数集中在<br>一个配置文件里<br>改参数不用翻业务代码</small>
+    </div>
+    <div class="placeholder" style="flex:1;min-width:180px;">
+      <strong>数据层独立</strong><br>
+      <small>数据获取/存储/计算<br>三层解耦<br>换数据源不影响上层</small>
+    </div>
+    <div class="placeholder" style="flex:1;min-width:180px;">
+      <strong>TypeScript 类型完备</strong><br>
+      <small>所有接口有类型定义<br>改代码时编辑器会提示<br>减少改出 bug</small>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>📂 推荐的目录结构</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding:16px;font-family:monospace;font-size:13px;line-height:1.8;">
+      <div style="color:#8b949e;">src/</div>
+      <div style="margin-left:16px;color:#8b949e;">├── config/</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   └── defaults.ts        ← 所有默认参数，改这里就能调</div>
+      <div style="margin-left:16px;color:#8b949e;">├── factors/</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── index.ts           ← 因子注册表</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── trend.ts           ← 趋势因子（独立文件）</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── momentum.ts        ← 动量因子</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── volatility.ts      ← 波动率因子</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   └── moneyFlow.ts       ← 资金流因子</div>
+      <div style="margin-left:16px;color:#8b949e;">├── engine/</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── scorer.ts          ← 加权评分</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── learner.ts         ← 自学习权重调整</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   └── backtest.ts        ← 回测</div>
+      <div style="margin-left:16px;color:#8b949e;">├── data/</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── fetcher.ts         ← 数据获取（AKShare等）</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── store.ts           ← IndexedDB 读写</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   └── cleaner.ts         ← 数据清洗</div>
+      <div style="margin-left:16px;color:#8b949e;">├── ui/</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── Dashboard.tsx      ← 看板页面</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── Detail.tsx         ← ETF 详情页</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   ├── Factors.tsx        ← 因子仪表盘</div>
+      <div style="margin-left:32px;color:#c9d1d9;">│   └── Settings.tsx       ← 设置页面</div>
+      <div style="margin-left:16px;color:#8b949e;">└── worker/</div>
+      <div style="margin-left:32px;color:#c9d1d9;">    └── analysis.worker.ts ← Web Worker 入口</div>
+    </div>
+  </div>
+  <p style="font-size:12px;color:#8b949e;margin-top:6px;">
+    💡 想加一个新因子？在 factors/ 下新建一个文件，参考 trend.ts 的结构写，然后在 index.ts 注册即可。settings 页面会自动出现新因子的配置项。
+  </p>
+</div>

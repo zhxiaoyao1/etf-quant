@@ -1,0 +1,69 @@
+<h2>系统整体架构</h2>
+<p class="subtitle">六大模块 · 全部运行在手机浏览器中</p>
+
+<div style="max-width:680px;margin:0 auto;">
+
+<div class="section">
+  <h3>📊 数据层</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="placeholder" style="flex:1;min-width:140px;">AKShare API<br><small>免费行情数据</small></div>
+    <div class="placeholder" style="flex:1;min-width:140px;">手动导入<br><small>CSV / Excel</small></div>
+    <div class="placeholder" style="flex:1;min-width:140px;">IndexedDB<br><small>本地持久化存储</small></div>
+  </div>
+</div>
+
+<div style="text-align:center;font-size:24px;margin:8px 0;">↓</div>
+
+<div class="section">
+  <h3>🧮 量化分析引擎</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="placeholder" style="flex:1;min-width:100px;">趋势因子<br><small>MA/EMA/MACD</small></div>
+    <div class="placeholder" style="flex:1;min-width:100px;">动量因子<br><small>RSI/KDJ/ROC</small></div>
+    <div class="placeholder" style="flex:1;min-width:100px;">波动率因子<br><small>布林带/ATR</small></div>
+    <div class="placeholder" style="flex:1;min-width:100px;">资金流因子<br><small>成交量/OBV</small></div>
+  </div>
+  <p style="margin-top:8px;text-align:center;">
+    <span class="mock-button" style="font-size:13px;">加权综合评分 → 信号</span>
+  </p>
+</div>
+
+<div style="display:flex;gap:16px;margin-top:12px;">
+  <div style="flex:1;text-align:center;">↓</div>
+  <div style="flex:1;text-align:center;">↓</div>
+</div>
+
+<div style="display:flex;gap:16px;">
+  <div class="section" style="flex:1;">
+    <h3>🧠 自学习模块</h3>
+    <div class="placeholder" style="min-height:80px;">
+      信号记录 → 结果跟踪<br>
+      <small>每周评估各因子表现</small><br>
+      <small>自动调整权重分配</small>
+    </div>
+  </div>
+  <div class="section" style="flex:1;">
+    <h3>📈 回测 & 展示</h3>
+    <div class="placeholder" style="min-height:80px;">
+      历史回测 · 收益曲线<br>
+      <small>信号面板 · ETF 列表</small><br>
+      <small>因子权重仪表盘</small>
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center;margin:16px 0;">
+  <div class="placeholder" style="display:inline-block;padding:8px 24px;">
+    ⚡ Web Worker 后台线程 — 计算不卡界面
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <h3>📱 PWA 壳</h3>
+  <div style="display:flex;gap:12px;">
+    <div class="placeholder" style="flex:1;">Service Worker<br><small>离线缓存+后台同步</small></div>
+    <div class="placeholder" style="flex:1;">添加到主屏幕<br><small>全屏原生体验</small></div>
+    <div class="placeholder" style="flex:1;">自动更新<br><small>无需应用商店</small></div>
+  </div>
+</div>
+
+</div>

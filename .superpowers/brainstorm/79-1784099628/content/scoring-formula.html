@@ -1,0 +1,86 @@
+<h2>综合评分公式</h2>
+<p class="subtitle">每个因子的分数如何计算 · 最终信号如何产生</p>
+
+<div class="section">
+  <h3>🔢 四因子评分标准（每项 0-100 分）</h3>
+
+  <div class="mockup">
+    <div class="mockup-body" style="padding:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr style="border-bottom:1px solid #30363d;">
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">因子</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">核心指标</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">评分逻辑</th>
+          <th style="padding:8px;text-align:left;color:#f0f6fc;">信号含义</th>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">趋势</td>
+          <td style="padding:8px;color:#c9d1d9;">MA5 > MA20 > MA60<br>MACD 金叉/死叉</td>
+          <td style="padding:8px;color:#c9d1d9;">均线多头排列 → 高分<br>空头排列 → 低分</td>
+          <td style="padding:8px;color:#8b949e;">方向判断</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">动量</td>
+          <td style="padding:8px;color:#c9d1d9;">RSI(14)<br>KDJ</td>
+          <td style="padding:8px;color:#c9d1d9;">RSI 30-70 区间线性映射<br>超卖→高分，超买→低分</td>
+          <td style="padding:8px;color:#8b949e;">买卖力度</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#f0f6fc;">波动率</td>
+          <td style="padding:8px;color:#c9d1d9;">布林带位置<br>ATR(14)</td>
+          <td style="padding:8px;color:#c9d1d9;">接近下轨→高分<br>接近上轨→低分</td>
+          <td style="padding:8px;color:#8b949e;">位置安全度</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#f0f6fc;">资金流</td>
+          <td style="padding:8px;color:#c9d1d9;">成交量变化率<br>OBV 趋势</td>
+          <td style="padding:8px;color:#c9d1d9;">放量上涨→高分<br>缩量下跌→低分</td>
+          <td style="padding:8px;color:#8b949e;">资金态度</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>⚖️ 加权综合公式</h3>
+  <div class="mockup">
+    <div class="mockup-header">最终评分 = 趋势×W₁ + 动量×W₂ + 波动率×W₃ + 资金流×W₄</div>
+    <div class="mockup-body" style="padding:16px;">
+      <div style="text-align:center;font-size:15px;color:#f0f6fc;margin-bottom:12px;">
+        <strong>综合评分</strong> = 75×0.33 + 82×0.24 + 60×0.22 + 68×0.21 = <strong style="color:#3fb950;">71.5</strong>
+      </div>
+      <div style="text-align:center;color:#8b949e;font-size:12px;margin-bottom:16px;">
+        W₁~W₄ 来自上轮自学习结果 · 每周自动更新
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;text-align:center;background:#161b22;border-radius:6px;padding:12px;border:1px solid #30363d;">
+          <div style="font-size:24px;">🟢</div>
+          <div style="color:#3fb950;font-weight:700;">≥70 买入</div>
+          <div style="color:#8b949e;font-size:11px;">强烈看多</div>
+        </div>
+        <div style="flex:1;text-align:center;background:#161b22;border-radius:6px;padding:12px;border:1px solid #30363d;">
+          <div style="font-size:24px;">🟡</div>
+          <div style="color:#d2991d;font-weight:700;">40-69 观望</div>
+          <div style="color:#8b949e;font-size:11px;">方向不明</div>
+        </div>
+        <div style="flex:1;text-align:center;background:#161b22;border-radius:6px;padding:12px;border:1px solid #30363d;">
+          <div style="font-size:24px;">🔴</div>
+          <div style="color:#f85149;font-weight:700;">&lt;40 卖出</div>
+          <div style="color:#8b949e;font-size:11px;">看空/避险</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🛠️ 技术栈</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="placeholder" style="flex:1;min-width:130px;">React + TypeScript<br><small>前端框架</small></div>
+    <div class="placeholder" style="flex:1;min-width:130px;">Lightweight Charts<br><small>K线图表</small></div>
+    <div class="placeholder" style="flex:1;min-width:130px;">IndexedDB<br><small>本地数据库</small></div>
+    <div class="placeholder" style="flex:1;min-width:130px;">Web Workers<br><small>后台计算</small></div>
+    <div class="placeholder" style="flex:1;min-width:130px;">Vite + PWA Plugin<br><small>构建 & 离线化</small></div>
+  </div>
+</div>

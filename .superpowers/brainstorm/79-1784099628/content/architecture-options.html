@@ -1,0 +1,82 @@
+<h2>系统架构方案对比</h2>
+<p class="subtitle">PWA 移动端 + 免费数据 + 因子权重自学习</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>纯前端 · 浏览器全搞定</h3>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优势</h4>
+          <ul>
+            <li>零服务器成本，静态页面即可</li>
+            <li>部署最简单，扔到 GitHub Pages 就能用</li>
+            <li>开箱即用，无需任何后端知识</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>劣势</h4>
+          <ul>
+            <li>浏览器端做量化计算性能有限</li>
+            <li>数据获取受浏览器跨域限制</li>
+            <li>数据无法持久化（清除缓存就丢失）</li>
+            <li>策略回测、参数优化等重计算几乎不可行</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Python 后端 + PWA 前端 ⭐ 推荐</h3>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优势</h4>
+          <ul>
+            <li>Python 是量化领域标准语言，生态最全</li>
+            <li>后端处理数据抓取、指标计算、回测、优化</li>
+            <li>PWA 前端只负责展示和交互，流畅轻量</li>
+            <li>数据持久化在本地 SQLite，安全可控</li>
+            <li>可跑在个人电脑/NAS/云服务器上</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>劣势</h4>
+          <ul>
+            <li>需要后端服务保持运行（电脑/NAS/低配云服务器）</li>
+            <li>部署比纯前端多一步</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Serverless 全云方案</h3>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优势</h4>
+          <ul>
+            <li>无需维护服务器，按量付费</li>
+            <li>天然高可用，随时随地访问</li>
+            <li>数据在云端，不依赖本地设备</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>劣势</h4>
+          <ul>
+            <li>有月度费用，用量上去后成本不可控</li>
+            <li>冷启动延迟影响体验</li>
+            <li>数据安全依赖第三方</li>
+            <li>对入门用户来说架构复杂度偏高</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

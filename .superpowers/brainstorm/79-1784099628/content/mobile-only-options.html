@@ -1,0 +1,57 @@
+<h2>纯手机运行方案</h2>
+<p class="subtitle">计算、存储、分析全部在手机上完成，无需外部服务器</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>增强型 PWA ⭐ 推荐</h3>
+      <p>一个网页应用，但利用现代浏览器能力做到接近原生体验。</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>能力清单</h4>
+          <ul>
+            <li><strong>IndexedDB</strong> — 本地数据库，存行情、信号、回测结果，永不过期</li>
+            <li><strong>Web Workers</strong> — 后台线程跑量化计算，不卡界面</li>
+            <li><strong>Service Worker</strong> — 离线缓存 + 后台定时拉取数据</li>
+            <li><strong>OPFS</strong> — 私有文件系统，存模型参数、历史快照</li>
+            <li>添加到主屏幕 = 全屏体验，和 App 一样</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>劣势</h4>
+          <ul>
+            <li>超大规模回测（>500 只标的）会吃力</li>
+            <li>iOS 上后台任务有时间限制</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>React Native / Flutter 原生 App</h3>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优势</h4>
+          <ul>
+            <li>真正的后台运行，不受浏览器沙箱限制</li>
+            <li>可调用原生 API（通知、Widget 等）</li>
+            <li>性能上限更高</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>劣势</h4>
+          <ul>
+            <li>开发量是 PWA 的 2-3 倍</li>
+            <li>iOS 和 Android 需要分别适配和上架</li>
+            <li>更新需要发版审核，不能像网页一样即时更新</li>
+            <li>对个人项目来说维护成本太高</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

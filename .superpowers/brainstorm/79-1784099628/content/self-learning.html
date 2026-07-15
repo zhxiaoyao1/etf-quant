@@ -1,0 +1,119 @@
+<h2>自学习机制</h2>
+<p class="subtitle">如何做到"根据决策好坏不断修正自己"</p>
+
+<div class="section">
+  <h3>🔄 学习循环</h3>
+  <div style="display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;padding:12px 0;">
+    <div class="placeholder" style="min-width:100px;text-align:center;">
+      <strong>① 发信号</strong><br>
+      <small>每日收盘后<br>综合评分 → 买入/观望/卖出</small>
+    </div>
+    <span style="font-size:18px;margin:0 4px;">→</span>
+    <div class="placeholder" style="min-width:100px;text-align:center;">
+      <strong>② 等结果</strong><br>
+      <small>N天后回头看<br>涨了还是跌了？</small>
+    </div>
+    <span style="font-size:18px;margin:0 4px;">→</span>
+    <div class="placeholder" style="min-width:100px;text-align:center;">
+      <strong>③ 评分</strong><br>
+      <small>每个因子打分<br>谁猜对了？谁猜错了？</small>
+    </div>
+    <span style="font-size:18px;margin:0 4px;">→</span>
+    <div class="placeholder" style="min-width:100px;text-align:center;">
+      <strong>④ 调权重</strong><br>
+      <small>表现好的因子 ↑<br>表现差的因子 ↓</small>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>⚖️ 权重调整算法</h3>
+  <div class="mockup">
+    <div class="mockup-header">每周自动运行一次（Web Worker 后台）</div>
+    <div class="mockup-body" style="font-family:monospace;font-size:13px;line-height:1.8;padding:16px;">
+      <p style="margin:0 0 8px 0;"><strong>输入：</strong>最近 20 条信号的各因子得分 + 实际涨跌结果</p>
+      <p style="margin:0 0 4px 0;"><strong>第1步：</strong>计算每个因子的近期准确率</p>
+      <div style="margin-left:16px;color:#888;">
+        趋势因子准确率 = 预测正确的次数 / 20<br>
+        动量因子准确率 = ...<br>
+        波动率因子准确率 = ...<br>
+        资金流因子准确率 = ...
+      </div>
+      <p style="margin:8px 0 4px 0;"><strong>第2步：</strong>按准确率重新分配权重</p>
+      <div style="margin-left:16px;color:#888;">
+        新权重 = 该因子准确率 / 所有因子准确率之和
+      </div>
+      <p style="margin:8px 0 4px 0;"><strong>第3步：</strong>平滑处理（防止剧烈波动）</p>
+      <div style="margin-left:16px;color:#888;">
+        最终权重 = 旧权重 × 0.7 + 新权重 × 0.3
+      </div>
+      <p style="margin:12px 0 0 0;color:#4caf50;"><strong>输出：</strong>更新后的因子权重 → 下次信号用新权重算</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>📋 举例说明</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding:16px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr style="border-bottom:1px solid #333;">
+          <th style="padding:6px;text-align:left;">因子</th>
+          <th style="padding:6px;">上周权重</th>
+          <th style="padding:6px;">近期准确率</th>
+          <th style="padding:6px;">新权重</th>
+          <th style="padding:6px;">变化</th>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px;">趋势</td>
+          <td style="padding:6px;text-align:center;">30%</td>
+          <td style="padding:6px;text-align:center;">65%</td>
+          <td style="padding:6px;text-align:center;">33%</td>
+          <td style="padding:6px;text-align:center;color:#4caf50;">↑</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px;">动量</td>
+          <td style="padding:6px;text-align:center;">25%</td>
+          <td style="padding:6px;text-align:center;">55%</td>
+          <td style="padding:6px;text-align:center;">24%</td>
+          <td style="padding:6px;text-align:center;color:#888;">→</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px;">波动率</td>
+          <td style="padding:6px;text-align:center;">25%</td>
+          <td style="padding:6px;text-align:center;">40%</td>
+          <td style="padding:6px;text-align:center;">22%</td>
+          <td style="padding:6px;text-align:center;color:#f44336;">↓</td>
+        </tr>
+        <tr>
+          <td style="padding:6px;">资金流</td>
+          <td style="padding:6px;text-align:center;">20%</td>
+          <td style="padding:6px;text-align:center;">70%</td>
+          <td style="padding:6px;text-align:center;">21%</td>
+          <td style="padding:6px;text-align:center;color:#4caf50;">↑</td>
+        </tr>
+      </table>
+      <p style="margin-top:12px;font-size:12px;color:#888;">
+        💡 最近市场资金流信号很准（70%），波动率信号不太准（40%），系统自动把钱流权重调高、波动率调低。
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🛡️ 安全边界</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="placeholder" style="flex:1;min-width:140px;">
+      <strong>上下限</strong><br>
+      <small>每个因子权重不低于 10%<br>不高于 50%</small>
+    </div>
+    <div class="placeholder" style="flex:1;min-width:140px;">
+      <strong>最小样本</strong><br>
+      <small>累计不足 10 条信号时<br>不做调整，等数据够了再说</small>
+    </div>
+    <div class="placeholder" style="flex:1;min-width:140px;">
+      <strong>人工干预</strong><br>
+      <small>你可以手动锁定某个<br>因子的权重，不让系统改</small>
+    </div>
+  </div>
+</div>
