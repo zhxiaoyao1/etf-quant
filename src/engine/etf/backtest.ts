@@ -1,6 +1,7 @@
 import type { KLine, SignalThresholds } from '../../types'
 import { scoreETF } from './scorer'
 import { DEFAULT_SIGNAL_THRESHOLDS } from '../../config/defaults'
+import { sma } from '../common'
 
 export interface BacktestTrade {
   buyDate: string
@@ -69,13 +70,7 @@ export function runBacktest(
     prevScore = initResult.compositeScore
   }
 
-  // 简易均线：最近 N 根 bar 的收盘均价
-  const smaAt = (idx: number, period: number) => {
-    if (idx < period - 1) return 0
-    let sum = 0
-    for (let j = idx - period + 1; j <= idx; j++) sum += bars[j].close
-    return sum / period
-  }
+  const closePrices = bars.map(b => b.close)
 
   for (let i = startIdx; i < bars.length - 1; i++) {
     // 自学习：每21个交易日根据近期信心加权准确率调整权重
@@ -110,8 +105,8 @@ export function runBacktest(
     const currentPrice = bars[i].close
 
     // 趋势判断：MA5 斜率判断短期方向
-    const maNow = smaAt(i, 5)
-    const maPrev = smaAt(i - 3, 5)
+    const maNow = sma(closePrices.slice(0, i + 1), 5)
+    const maPrev = sma(closePrices.slice(0, i - 2), 5)
     const priceTrendUp = maNow > maPrev
     const priceTrendDown = maNow < maPrev
 

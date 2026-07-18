@@ -4,6 +4,7 @@ import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
 import { useETFWorker } from '../hooks/useWorker'
 import { getETFList, saveETFList, getSignals, getKLines, getWeights, getSetting } from '../data/db'
 import { scoreETF } from '../engine/etf/scorer'
+import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Dashboard.css'
 
 interface ScorePoint { date: string; score: number; signal: string }
@@ -67,11 +68,6 @@ export default function Dashboard() {
     setSignals(new Map(map))
   }
 
-  const signalEmoji = (s: string) => s === 'buy' ? '🟢' : s === 'sell' ? '🔴' : '🟡'
-  const signalLabel = (s: string) => s === 'buy' ? '买入' : s === 'sell' ? '卖出' : '观望'
-  const scoreColor = (s: string) =>
-    s === 'buy' ? 'var(--green)' : s === 'sell' ? 'var(--red)' : 'var(--yellow)'
-
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -103,7 +99,7 @@ export default function Dashboard() {
               </div>
               <div className="etf-score">
                 {sig ? (
-                  <span style={{ color: scoreColor(sig.signal), fontWeight: 700, fontSize: 22 }}>
+                  <span style={{ color: signalColor(sig.signal), fontWeight: 700, fontSize: 22 }}>
                     {sig.compositeScore}
                   </span>
                 ) : (
@@ -139,7 +135,7 @@ export default function Dashboard() {
                       )}
                     </span>
                     <span className="score-emoji">{signalEmoji(s.signal)}</span>
-                    <span className="score-num" style={{ color: scoreColor(s.signal) }}>{s.score}</span>
+                    <span className="score-num" style={{ color: signalColor(s.signal) }}>{s.score}</span>
                   </div>
                 ))
               )}

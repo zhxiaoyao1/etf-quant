@@ -4,6 +4,7 @@ import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { getETFList, getKLines, getSignals, getSetting } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
+import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
 
 function calcMA(data: { time: string; value: number }[], period: number): { time: string; value: number }[] {
@@ -327,7 +328,6 @@ export default function Detail() {
   }
 
   const latestSignal = signals[0]
-  const signalEmoji = (s: string) => s === 'buy' ? '\u{1F7E2}' : s === 'sell' ? '\u{1F534}' : '\u{1F7E1}'
 
   return (
     <div className="detail">
@@ -344,7 +344,7 @@ export default function Detail() {
         <div className={`signal-banner signal-${latestSignal.signal}`}>
           <span className="signal-emoji-large">{signalEmoji(latestSignal.signal)}</span>
           <div>
-            <div className="signal-text">{latestSignal.signal === 'buy' ? '买入' : latestSignal.signal === 'sell' ? '卖出' : '观望'}</div>
+            <div className="signal-text">{signalLabel(latestSignal.signal)}</div>
             <div className="signal-date">{latestSignal.date}</div>
           </div>
           <div className="signal-score-det">{latestSignal.compositeScore}</div>
@@ -386,13 +386,13 @@ export default function Detail() {
         </div>
       )}
 
-      <h3 style={{ marginTop: 16, marginBottom: 8 }}>信号历史</h3>
+      <h3 className="section-title">信号历史</h3>
       <div className="signal-history">
         {signals.slice(0, 10).map(sig => (
           <div key={sig.id} className="history-item">
             <span>{sig.date}</span>
             <span>{signalEmoji(sig.signal)}</span>
-            <span style={{ color: sig.signal === 'buy' ? 'var(--green)' : sig.signal === 'sell' ? 'var(--red)' : 'var(--yellow)' }}>{sig.compositeScore}</span>
+            <span style={{ color: signalColor(sig.signal) }}>{sig.compositeScore}</span>
           </div>
         ))}
         {signals.length === 0 && <div className="history-item"><span style={{color: 'var(--text-secondary)'}}>暂无信号记录</span></div>}
@@ -400,7 +400,7 @@ export default function Detail() {
 
       {backtestResult && backtestResult.equityCurve.length > 0 && (
         <div className="backtest-results">
-          <h3 style={{ marginTop: 16, marginBottom: 4 }}>📊 回测结果 - {selectedETF?.name}</h3>
+          <h3 className="section-title-sm">📊 回测结果 - {selectedETF?.name}</h3>
           <div className="backtest-period">
             {selectedETF?.code}.{selectedETF?.market} · 回测区间：{backtestResult.equityCurve[0].date} ~ {backtestResult.equityCurve[backtestResult.equityCurve.length - 1].date}
             · 共 {backtestResult.equityCurve.length} 个交易日

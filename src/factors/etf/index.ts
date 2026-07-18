@@ -10,7 +10,3 @@ export const etfFactors: Factor[] = [
   volatilityFactor,
   moneyFlowFactor,
 ]
-
-export function getFactorById(id: string): Factor | undefined {
-  return etfFactors.find(f => f.id === id)
-}

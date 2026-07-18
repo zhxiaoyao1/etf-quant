@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { FundNAV } from '../types'
 import { fetchFundNAV } from '../data/fundFetcher'
 import { saveSetting, getSetting } from '../data/db'
+import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './FundPicker.css'
 
 interface PortfolioItem {
@@ -73,18 +74,6 @@ function calcHoldMonths(buyDate: string): number {
 
 function fmtPct(v: number): string {
   return `${(v * 100).toFixed(2)}%`
-}
-
-function signalEmoji(s: string): string {
-  return s === 'buy' ? '🟢' : s === 'sell' ? '🔴' : '🟡'
-}
-
-function signalLabel(s: string): string {
-  return s === 'buy' ? '买入' : s === 'sell' ? '卖出' : '观望'
-}
-
-function signalColor(s: string): string {
-  return s === 'buy' ? 'var(--green)' : s === 'sell' ? 'var(--red)' : 'var(--yellow)'
 }
 
 export default function FundPicker() {

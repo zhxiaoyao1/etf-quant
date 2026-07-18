@@ -1,17 +1,6 @@
 import type { Factor, KLine } from '../../types'
 import { FACTOR_PARAMS } from '../../config/defaults'
-
-function sma(bars: KLine[], period: number): number[] {
-  const result: number[] = []
-  for (let i = period - 1; i < bars.length; i++) {
-    let sum = 0
-    for (let j = i - period + 1; j <= i; j++) {
-      sum += bars[j].close
-    }
-    result.push(sum / period)
-  }
-  return result
-}
+import { smaSeries } from '../../engine/common'
 
 function ema(bars: KLine[], period: number): number[] {
   const result: number[] = []
@@ -62,9 +51,10 @@ export const trendFactor: Factor = {
   calculate(bars: KLine[]): number {
     if (bars.length < 60) return 50
     const p = this.params
-    const ma5 = sma(bars, p.maFast as number)
-    const ma20 = sma(bars, p.maMid as number)
-    const ma60 = sma(bars, p.maSlow as number)
+    const closePrices = bars.map(b => b.close)
+    const ma5 = smaSeries(closePrices, p.maFast as number)
+    const ma20 = smaSeries(closePrices, p.maMid as number)
+    const ma60 = smaSeries(closePrices, p.maSlow as number)
 
     const latest5 = ma5[ma5.length - 1]
     const latest20 = ma20[ma20.length - 1]
