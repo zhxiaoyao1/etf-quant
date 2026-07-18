@@ -35,6 +35,7 @@ export interface BacktestResult {
 export interface BacktestOptions {
   useLearning?: boolean     // 每21天自动学习调整权重
   positionSizing?: boolean  // 根据信号强度动态仓位（非满仓进出）
+  benchmarkBars?: KLine[]   // 大盘K线（如沪深300），用于宏观择时过滤
 }
 
 export function runBacktest(
@@ -44,7 +45,7 @@ export function runBacktest(
   initialCapital: number = 100000,
   options: BacktestOptions = {}
 ): BacktestResult {
-  const { useLearning = false, positionSizing = false } = options
+  const { useLearning = false, positionSizing = false, benchmarkBars } = options
   if (bars.length < 80) {
     return {
       totalReturn: 0, annualizedReturn: 0, maxDrawdown: 0,
@@ -122,12 +123,26 @@ export function runBacktest(
     const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
     const validSell = crossedSell && priceTrendDown
 
+    // 大盘择时：检查基准ETF的MA5趋势
+    let marketOk = true
+    if (benchmarkBars && benchmarkBars.length > i) {
+      const bmLast5 = benchmarkBars.slice(Math.max(0, i - 4), i + 1)
+      const bmPrev5 = benchmarkBars.slice(Math.max(0, i - 8), Math.max(0, i - 3))
+      if (bmLast5.length >= 5 && bmPrev5.length >= 5) {
+        const bmMaNow = bmLast5.reduce((s, b) => s + b.close, 0) / 5
+        const bmMaPrev = bmPrev5.reduce((s, b) => s + b.close, 0) / 5
+        marketOk = bmMaNow > bmMaPrev  // 大盘MA5向上才是好环境
+      }
+    }
+
     if (!holding && validBuy) {
       const nextOpen = bars[i + 1].open
       // 仓位：分数越高仓位越重，最低30%，最高100%
-      const pct = positionSizing
+      let pct = positionSizing
         ? Math.min(1.0, Math.max(0.3, (currentScore - thresholds.buyThreshold) / (100 - thresholds.buyThreshold) * 0.7 + 0.3))
         : 1.0
+      // 大盘下跌时仓位减半
+      if (benchmarkBars && !marketOk) pct *= 0.5
       const investAmount = cash * pct
       shares = investAmount / nextOpen
       cash -= investAmount

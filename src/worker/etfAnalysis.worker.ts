@@ -10,7 +10,7 @@ type WorkerMessage =
   | { type: 'analyze'; etfs: ETFInfo[]; thresholds?: SignalThresholds }
   | { type: 'learn'; etfCode: string; config?: LearningConfig }
   | { type: 'fetchAndStore'; etfs: ETFInfo[] }
-  | { type: 'backtest'; etfCode: string; buyThreshold: number; sellThreshold: number; options?: Record<string, any> }
+  | { type: 'backtest'; etfCode: string; buyThreshold: number; sellThreshold: number; options?: Record<string, any>; benchmarkCode?: string }
   | { type: 'optimize'; etfCode: string }
   | { type: 'optimizeAll'; etfCode: string }
 
@@ -98,14 +98,20 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       self.postMessage({ type: 'fetchComplete', count })
 
     } else if (msg.type === 'backtest') {
-      const { etfCode, buyThreshold, sellThreshold, options } = msg
+      const { etfCode, buyThreshold, sellThreshold, options, benchmarkCode } = msg
       const bars = await getKLines(etfCode)
       if (bars.length < 80) {
         self.postMessage({ type: 'error', message: `需要至少80天K线数据，当前${bars.length}天` })
         return
       }
+      // 大盘择时：取基准ETF的K线
+      let benchmarkBars: any[] | undefined
+      if (benchmarkCode) {
+        benchmarkBars = await getKLines(benchmarkCode)
+      }
       const weights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
-      const result = runBacktest(bars, weights, { buyThreshold, sellThreshold }, 100000, options ?? {})
+      const opts = { ...(options ?? {}), benchmarkBars }
+      const result = runBacktest(bars, weights, { buyThreshold, sellThreshold }, 100000, opts)
       self.postMessage({ type: 'backtestResult', result })
 
     } else if (msg.type === 'optimize') {
