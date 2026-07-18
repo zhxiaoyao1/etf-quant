@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [signals, setSignals] = useState<Map<string, Signal>>(new Map())
   const [modalETF, setModalETF] = useState<ETFInfo | null>(null)
   const [recentScores, setRecentScores] = useState<ScorePoint[]>([])
-  const { fetchAndStore, analyze, loading } = useETFWorker()
+  const { refresh, loading } = useETFWorker()
 
   useEffect(() => {
     getETFList().then(list => {
@@ -59,8 +59,7 @@ export default function Dashboard() {
 
   const handleRefresh = async () => {
     if (etfs.length === 0) return
-    await fetchAndStore(etfs)
-    const newSignals = await analyze(etfs)
+    const newSignals = await refresh(etfs)
     const map = new Map(signals)
     for (const s of newSignals) {
       map.set(s.etfCode, s)

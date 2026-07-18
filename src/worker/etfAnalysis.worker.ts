@@ -10,6 +10,7 @@ type WorkerMessage =
   | { type: 'analyze'; etfs: ETFInfo[]; thresholds?: SignalThresholds }
   | { type: 'learn'; etfCode: string; config?: LearningConfig }
   | { type: 'fetchAndStore'; etfs: ETFInfo[] }
+  | { type: 'refresh'; etfs: ETFInfo[] }
   | { type: 'backtest'; etfCode: string; buyThreshold: number; sellThreshold: number; options?: Record<string, any>; benchmarkCode?: string }
   | { type: 'optimize'; etfCode: string }
   | { type: 'optimizeAll'; etfCode: string }
@@ -84,6 +85,35 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       }
       await saveLearningLog(log)
       self.postMessage({ type: 'learnComplete', log })
+
+    } else if (msg.type === 'refresh') {
+      const { etfs } = msg
+      const data = await fetchAllETFs(etfs)
+      for (const [code, bars] of data) {
+        if (bars.length > 0) await saveKLines(code, bars)
+      }
+      const signals: Signal[] = []
+      for (const etf of etfs) {
+        let bars = await getKLines(etf.code)
+        if (bars.length === 0) continue
+        let weights = await getWeights('etf')
+        if (!weights) { weights = { ...DEFAULT_ETF_WEIGHTS }; await saveWeights('etf', weights) }
+        const savedBuy = await getSetting<number>('buyThreshold')
+        const savedSell = await getSetting<number>('sellThreshold')
+        const effective = (savedBuy && savedSell) ? { buyThreshold: savedBuy, sellThreshold: savedSell } : DEFAULT_SIGNAL_THRESHOLDS
+        const result = scoreETF(bars, weights, effective)
+        let finalSignal = result.signal
+        if (bars.length >= 8) {
+          const ma5Now = bars.slice(-5).reduce((s: number, b: any) => s + b.close, 0) / 5
+          const ma5Prev = bars.slice(-8, -3).reduce((s: number, b: any) => s + b.close, 0) / 5
+          if (result.signal === 'buy' && ma5Now <= ma5Prev) finalSignal = 'hold'
+          if (result.signal === 'sell' && ma5Now >= ma5Prev) finalSignal = 'hold'
+        }
+        const signal: Signal = { id: `etf-${etf.code}-${new Date().toISOString().slice(0, 10)}`, etfCode: etf.code, date: new Date().toISOString().slice(0, 10), compositeScore: result.compositeScore, signal: finalSignal, factorScores: result.factorScores, weights: result.weights }
+        await saveSignal(signal)
+        signals.push(signal)
+      }
+      self.postMessage({ type: 'analysisComplete', signals })
 
     } else if (msg.type === 'fetchAndStore') {
       const { etfs } = msg

@@ -122,5 +122,23 @@ export function useETFWorker() {
     []
   )
 
-  return { fetchAndStore, analyze, learn, backtest, optimize, optimizeAll, loading }
+  const refresh = useCallback(
+    (etfs: ETFInfo[]): Promise<Signal[]> => {
+      return new Promise((resolve, reject) => {
+        const worker = createWorker()
+        setLoading(true)
+        worker.onmessage = (e) => {
+          setLoading(false)
+          worker.terminate()
+          if (e.data.type === 'analysisComplete') resolve(e.data.signals)
+          else if (e.data.type === 'error') reject(new Error(e.data.message))
+        }
+        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
+        worker.postMessage({ type: 'refresh', etfs })
+      })
+    },
+    []
+  )
+
+  return { refresh, fetchAndStore, analyze, learn, backtest, optimize, optimizeAll, loading }
 }
