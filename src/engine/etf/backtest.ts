@@ -22,6 +22,7 @@ export interface BacktestResult {
   equityCurve: { date: string; value: number }[]
   trades: BacktestTrade[]
   buyAndHoldReturn: number  // benchmark
+  finalWeights?: Record<string, number>
 }
 
 /**
@@ -31,17 +32,23 @@ export interface BacktestResult {
  * @param thresholds Signal thresholds (default: buy>=80, sell<40)
  * @param initialCapital Starting capital (default: 100000)
  */
+export interface BacktestOptions {
+  useLearning?: boolean   // 每21天自动学习调整权重
+}
+
 export function runBacktest(
   bars: KLine[],
   weights: Record<string, number>,
   thresholds: SignalThresholds = DEFAULT_SIGNAL_THRESHOLDS,
-  initialCapital: number = 100000
+  initialCapital: number = 100000,
+  options: BacktestOptions = {}
 ): BacktestResult {
+  const { useLearning = false } = options
   if (bars.length < 80) {
     return {
       totalReturn: 0, annualizedReturn: 0, maxDrawdown: 0,
       sharpeRatio: 0, winRate: 0, totalTrades: 0, winningTrades: 0,
-      equityCurve: [], trades: [], buyAndHoldReturn: 0,
+      equityCurve: [], trades: [], buyAndHoldReturn: 0, finalWeights: undefined,
     }
   }
 
@@ -69,6 +76,31 @@ export function runBacktest(
   }
 
   for (let i = startIdx; i < bars.length - 1; i++) {
+    // 自学习：每21个交易日根据近期准确率调整权重
+    if (useLearning && i > startIdx + 21 && (i - startIdx) % 21 === 0) {
+      const factorIds = Object.keys(weights)
+      const correct: Record<string, number> = {}
+      const total: Record<string, number> = {}
+      for (const id of factorIds) { correct[id] = 0; total[id] = 0 }
+      // 取最近21天，每天打分并与5天后实际涨跌对比
+      for (let j = Math.max(startIdx, i - 21); j <= Math.min(i, bars.length - 6); j++) {
+        const r = scoreETF(bars.slice(0, j + 1), weights, thresholds)
+        const actualUp = bars[j + 5].close > bars[j].close
+        for (const fs of r.factorScores) {
+          total[fs.factorId] = (total[fs.factorId] ?? 0) + 1
+          if ((fs.score > 50) === actualUp) correct[fs.factorId] = (correct[fs.factorId] ?? 0) + 1
+        }
+      }
+      // 按准确率重新分配权重（平滑50%）
+      const acc: Record<string, number> = {}
+      for (const id of factorIds) acc[id] = total[id] > 0 ? (correct[id] ?? 0) / total[id] : 0.25
+      const sum = Object.values(acc).reduce((s, v) => s + v, 0) || 1
+      for (const id of factorIds) {
+        const raw = acc[id] / sum
+        weights[id] = Math.max(0.1, Math.min(0.5, weights[id] * 0.5 + raw * 0.5))
+      }
+    }
+
     const windowBars = bars.slice(0, i + 1)
     const result = scoreETF(windowBars, weights, thresholds)
     const currentScore = result.compositeScore
@@ -194,6 +226,7 @@ export function runBacktest(
     equityCurve,
     trades,
     buyAndHoldReturn,
+    finalWeights: useLearning ? { ...weights } : undefined,
   }
 }
 

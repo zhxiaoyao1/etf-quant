@@ -10,7 +10,7 @@ type WorkerMessage =
   | { type: 'analyze'; etfs: ETFInfo[]; thresholds?: SignalThresholds }
   | { type: 'learn'; etfCode: string; config?: LearningConfig }
   | { type: 'fetchAndStore'; etfs: ETFInfo[] }
-  | { type: 'backtest'; etfCode: string; buyThreshold: number; sellThreshold: number }
+  | { type: 'backtest'; etfCode: string; buyThreshold: number; sellThreshold: number; options?: Record<string, any> }
   | { type: 'optimize'; etfCode: string }
   | { type: 'optimizeAll'; etfCode: string }
 
@@ -98,14 +98,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       self.postMessage({ type: 'fetchComplete', count })
 
     } else if (msg.type === 'backtest') {
-      const { etfCode, buyThreshold, sellThreshold } = msg
+      const { etfCode, buyThreshold, sellThreshold, options } = msg
       const bars = await getKLines(etfCode)
       if (bars.length < 80) {
         self.postMessage({ type: 'error', message: `需要至少80天K线数据，当前${bars.length}天` })
         return
       }
       const weights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
-      const result = runBacktest(bars, weights, { buyThreshold, sellThreshold })
+      const result = runBacktest(bars, weights, { buyThreshold, sellThreshold }, 100000, options ?? {})
       self.postMessage({ type: 'backtestResult', result })
 
     } else if (msg.type === 'optimize') {

@@ -28,6 +28,7 @@ export default function Detail() {
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
   const [btSell, setBtSell] = useState(40)
+  const [btLearning, setBtLearning] = useState(false)
   const [btError, setBtError] = useState('')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -310,7 +311,7 @@ export default function Detail() {
     const ok = await ensureData()
     if (!ok) { setBacktesting(false); return }
     try {
-      const result = await workerBacktest(selectedETF.code, btBuy, btSell)
+      const result = await workerBacktest(selectedETF.code, btBuy, btSell, { useLearning: btLearning })
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -403,9 +404,11 @@ export default function Detail() {
           </div>
           <div className="backtest-params">
             买入≥{btBuy} 卖出&lt;{btSell}
-            {backtestResult.weights && (
+            {backtestResult.finalWeights ? (
+              <span> · 学习后权重：趋势{(backtestResult.finalWeights.trend * 100).toFixed(0)}% 动量{(backtestResult.finalWeights.momentum * 100).toFixed(0)}% 波动{(backtestResult.finalWeights.volatility * 100).toFixed(0)}% 资金{(backtestResult.finalWeights.moneyFlow * 100).toFixed(0)}%</span>
+            ) : backtestResult.weights ? (
               <span> · 权重：趋势{(backtestResult.weights.trend * 100).toFixed(0)}% 动量{(backtestResult.weights.momentum * 100).toFixed(0)}% 波动{(backtestResult.weights.volatility * 100).toFixed(0)}% 资金{(backtestResult.weights.moneyFlow * 100).toFixed(0)}%</span>
-            )}
+            ) : null}
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">
@@ -479,6 +482,10 @@ export default function Detail() {
       {btError && (
         <div className="backtest-hint">{btError}</div>
       )}
+      <div className="bt-learning-toggle" onClick={() => setBtLearning(!btLearning)}>
+        <span className={`toggle-dot${btLearning ? ' on' : ''}`}>{btLearning ? '🟢' : '⚪'}</span>
+        <span>自学习模式：回测中每21天自动调整权重</span>
+      </div>
       <div className="bt-buttons">
         <button
           className={`backtest-btn${backtesting ? ' loading' : ''}`}

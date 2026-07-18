@@ -72,7 +72,7 @@ export function useETFWorker() {
 
   // 回测和寻优各用独立 Worker，避免消息处理冲突
   const backtest = useCallback(
-    (etfCode: string, buyThreshold: number, sellThreshold: number): Promise<any> => {
+    (etfCode: string, buyThreshold: number, sellThreshold: number, options?: Record<string, any>): Promise<any> => {
       return new Promise((resolve, reject) => {
         const worker = createWorker()
         setLoading(true)
@@ -83,7 +83,7 @@ export function useETFWorker() {
           else if (e.data.type === 'error') reject(new Error(e.data.message))
         }
         worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'backtest', etfCode, buyThreshold, sellThreshold })
+        worker.postMessage({ type: 'backtest', etfCode, buyThreshold, sellThreshold, options })
       })
     },
     []

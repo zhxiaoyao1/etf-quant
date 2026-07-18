@@ -150,6 +150,21 @@
   cursor: pointer;
 }
 .learn-btn:disabled { opacity: 0.4; }
+.bt-learning-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.toggle-dot { font-size: 16px; }
+.toggle-dot.on { }
 .backtest-controls {
   background: var(--bg-card);
   border: 1px solid var(--border);
