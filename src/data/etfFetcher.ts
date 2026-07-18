@@ -3,7 +3,7 @@ import { processKLines } from './cleaner'
 
 function buildKLineUrl(code: string, market: 'SH' | 'SZ'): string {
   const secid = market === 'SH' ? `1.${code}` : `0.${code}`
-  return `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&end=20500101&lmt=2000`
+  return `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&end=20500101&lmt=800`
 }
 
 function parseEastMoneyKLine(raw: unknown): KLine[] {
