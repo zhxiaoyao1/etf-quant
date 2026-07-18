@@ -109,7 +109,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       if (benchmarkCode) {
         benchmarkBars = await getKLines(benchmarkCode)
       }
-      const weights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
+      const weights = options?.manualWeights ?? await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
       const opts = { ...(options ?? {}), benchmarkBars }
       const result = runBacktest(bars, weights, { buyThreshold, sellThreshold }, 100000, opts)
       self.postMessage({ type: 'backtestResult', result })
