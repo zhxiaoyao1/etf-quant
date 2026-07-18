@@ -24,14 +24,11 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, optimizeAll: workerOptimizeAll, learn: workerLearn } = useETFWorker()
+  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, learn: workerLearn } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
   const [btSell, setBtSell] = useState(40)
-  const [btLearning, setBtLearning] = useState(false)
-  const [btPosSize, setBtPosSize] = useState(false)
-  const [btMarket, setBtMarket] = useState(false)
   const [btError, setBtError] = useState('')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -257,32 +254,6 @@ export default function Detail() {
     }
   }
 
-  const handleOptimizeAll = async () => {
-    if (!selectedETF) return
-    setBtError('')
-    setBacktesting(true)
-    const ok = await ensureData()
-    if (!ok) { setBacktesting(false); return }
-    try {
-      const opt = await workerOptimizeAll(selectedETF.code)
-      setBtBuy(opt.bestBuy)
-      setBtSell(opt.bestSell)
-      setBacktestResult(opt.result)
-      // 保存优化结果：权重 + 阈值都存
-      const { saveWeights, saveSetting } = await import('../data/db')
-      await saveWeights('etf', opt.bestWeights)
-      await saveSetting('buyThreshold', opt.bestBuy)
-      await saveSetting('sellThreshold', opt.bestSell)
-      setTimeout(() => {
-        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
-    } catch (err: any) {
-      setBtError(err?.message || '全优化失败，请重试')
-    } finally {
-      setBacktesting(false)
-    }
-  }
-
   const handleLearn = async () => {
     if (!selectedETF) return
     setBtError('')
@@ -314,8 +285,7 @@ export default function Detail() {
     const ok = await ensureData()
     if (!ok) { setBacktesting(false); return }
     try {
-      const bm = btMarket ? '510300' : undefined
-      const result = await workerBacktest(selectedETF.code, btBuy, btSell, { useLearning: btLearning, positionSizing: btPosSize }, bm)
+      const result = await workerBacktest(selectedETF.code, btBuy, btSell)
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -406,7 +376,7 @@ export default function Detail() {
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            买入≥{btBuy} 卖出&lt;{btSell}{btLearning ? ' · 自学习' : ''}{btPosSize ? ' · 仓位管理' : ''}{btMarket ? ' · 大盘择时' : ''}
+            买入≥{btBuy} 卖出&lt;{btSell}
             {backtestResult.finalWeights ? (
               <span> · 学习后权重：趋势{(backtestResult.finalWeights.trend * 100).toFixed(0)}% 动量{(backtestResult.finalWeights.momentum * 100).toFixed(0)}% 波动{(backtestResult.finalWeights.volatility * 100).toFixed(0)}% 资金{(backtestResult.finalWeights.moneyFlow * 100).toFixed(0)}%</span>
             ) : backtestResult.weights ? (
@@ -485,18 +455,6 @@ export default function Detail() {
       {btError && (
         <div className="backtest-hint">{btError}</div>
       )}
-      <div className="bt-learning-toggle" onClick={() => setBtLearning(!btLearning)}>
-        <span className={`toggle-dot${btLearning ? ' on' : ''}`}>{btLearning ? '🟢' : '⚪'}</span>
-        <span>自学习模式：回测中每21天自动调整权重</span>
-      </div>
-      <div className="bt-learning-toggle" onClick={() => setBtPosSize(!btPosSize)}>
-        <span className={`toggle-dot${btPosSize ? ' on' : ''}`}>{btPosSize ? '🟢' : '⚪'}</span>
-        <span>仓位管理：信号越强仓位越重（30%-100%）</span>
-      </div>
-      <div className="bt-learning-toggle" onClick={() => setBtMarket(!btMarket)}>
-        <span className={`toggle-dot${btMarket ? ' on' : ''}`}>{btMarket ? '🟢' : '⚪'}</span>
-        <span>大盘择时：沪深300下跌时买入仓位减半</span>
-      </div>
       <div className="bt-buttons">
         <button
           className={`backtest-btn${backtesting ? ' loading' : ''}`}
@@ -511,13 +469,6 @@ export default function Detail() {
           disabled={backtesting}
         >
           🤖 寻优阈值
-        </button>
-        <button
-          className="optimize-all-btn"
-          onClick={handleOptimizeAll}
-          disabled={backtesting}
-        >
-          🧬 寻优权重+阈值
         </button>
         <button
           className="learn-btn"
