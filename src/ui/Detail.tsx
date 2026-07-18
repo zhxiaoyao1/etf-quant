@@ -24,7 +24,7 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, learn: workerLearn } = useETFWorker()
+  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, optimizeAll: workerOptimizeAll, learn: workerLearn } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
@@ -266,6 +266,31 @@ export default function Detail() {
     }
   }
 
+  const handleOptimizeAll = async () => {
+    if (!selectedETF) return
+    setBtError('')
+    setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
+    try {
+      const opt = await workerOptimizeAll(selectedETF.code)
+      setBtBuy(opt.bestBuy)
+      setBtSell(opt.bestSell)
+      setBacktestResult(opt.result)
+      const { saveWeights, saveSetting } = await import('../data/db')
+      await saveWeights('etf', opt.bestWeights)
+      await saveSetting('buyThreshold', opt.bestBuy)
+      await saveSetting('sellThreshold', opt.bestSell)
+      setTimeout(() => {
+        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } catch (err: any) {
+      setBtError(err?.message || '全优化失败，请重试')
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
   const handleLearn = async () => {
     if (!selectedETF) return
     setBtError('')
@@ -502,6 +527,13 @@ export default function Detail() {
           disabled={backtesting}
         >
           🤖 寻优阈值
+        </button>
+        <button
+          className="optimize-all-btn"
+          onClick={handleOptimizeAll}
+          disabled={backtesting}
+        >
+          🧬 寻优权重+阈值
         </button>
         <button
           className="learn-btn"
