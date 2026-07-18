@@ -98,13 +98,3 @@ export function learnFromHistory(
 
   return { newWeights: normalized, factorAccuracies: accuracies, sampleCount }
 }
-
-// 保留旧函数兼容
-export function adjustWeights(
-  _signals: any[],
-  _actualOutcome: string,
-  oldWeights: Record<string, number>,
-  _config: LearningConfig = DEFAULT_LEARNING_CONFIG
-): AdjustmentResult {
-  return { newWeights: { ...oldWeights }, factorAccuracies: {}, sampleCount: 0 }
-}

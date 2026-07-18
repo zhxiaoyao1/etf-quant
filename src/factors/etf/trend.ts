@@ -33,10 +33,13 @@ function macd(
 ): { dif: number[]; dea: number[]; histogram: number[] } {
   const emaFast = ema(bars, fastPeriod)
   const emaSlow = ema(bars, slowPeriod)
-  const offset = slowPeriod - fastPeriod
+  // Pad emaSlow to match emaFast length by repeating the last value
+  for (let j = emaSlow.length; j < emaFast.length; j++) {
+    emaSlow.push(emaSlow[emaSlow.length - 1])
+  }
   const dif: number[] = []
   for (let i = 0; i < emaFast.length; i++) {
-    dif.push(emaFast[i] - (emaSlow[i + offset] ?? emaSlow[emaSlow.length - 1]))
+    dif.push(emaFast[i] - emaSlow[i])
   }
   const deaValues: number[] = []
   const k = 2 / (signalPeriod + 1)

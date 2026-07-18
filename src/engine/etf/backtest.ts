@@ -298,6 +298,7 @@ export function optimizeThresholds(
     let maxTrades = 0
     for (let buy = 50; buy <= 90; buy += 5) {
       for (let sell = 20; sell <= 55; sell += 5) {
+        tested++
         const result = runBacktest(bars, weights, { buyThreshold: buy, sellThreshold: sell })
         if (result.totalTrades > maxTrades) {
           maxTrades = result.totalTrades
@@ -306,7 +307,6 @@ export function optimizeThresholds(
           bestResult = result
         }
       }
-      tested++
     }
   }
 

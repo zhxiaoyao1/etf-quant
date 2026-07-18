@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { ETFInfo, Signal, LearningLog } from '../types'
 
 function createWorker(): Worker {
@@ -9,65 +9,60 @@ function createWorker(): Worker {
 }
 
 export function useETFWorker() {
-  const workerRef = useRef<Worker | null>(null)
   const [loading, setLoading] = useState(false)
-
-  const getWorker = useCallback(() => {
-    if (!workerRef.current) {
-      workerRef.current = createWorker()
-    }
-    return workerRef.current
-  }, [])
 
   const fetchAndStore = useCallback(
     (etfs: ETFInfo[]): Promise<number> => {
       return new Promise((resolve, reject) => {
-        const worker = getWorker()
+        const worker = createWorker()
         setLoading(true)
         worker.onmessage = (e) => {
           setLoading(false)
+          worker.terminate()
           if (e.data.type === 'fetchComplete') resolve(e.data.count)
           else if (e.data.type === 'error') reject(new Error(e.data.message))
         }
-        worker.onerror = (err) => { setLoading(false); reject(err) }
+        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
         worker.postMessage({ type: 'fetchAndStore', etfs })
       })
     },
-    [getWorker]
+    []
   )
 
   const analyze = useCallback(
     (etfs: ETFInfo[]): Promise<Signal[]> => {
       return new Promise((resolve, reject) => {
-        const worker = getWorker()
+        const worker = createWorker()
         setLoading(true)
         worker.onmessage = (e) => {
           setLoading(false)
+          worker.terminate()
           if (e.data.type === 'analysisComplete') resolve(e.data.signals)
           else if (e.data.type === 'error') reject(new Error(e.data.message))
         }
-        worker.onerror = (err) => { setLoading(false); reject(err) }
+        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
         worker.postMessage({ type: 'analyze', etfs })
       })
     },
-    [getWorker]
+    []
   )
 
   const learn = useCallback(
     (etfCode: string): Promise<LearningLog> => {
       return new Promise((resolve, reject) => {
-        const worker = getWorker()
+        const worker = createWorker()
         setLoading(true)
         worker.onmessage = (e) => {
           setLoading(false)
+          worker.terminate()
           if (e.data.type === 'learnComplete') resolve(e.data.log)
           else if (e.data.type === 'error') reject(new Error(e.data.message))
         }
-        worker.onerror = (err) => { setLoading(false); reject(err) }
+        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
         worker.postMessage({ type: 'learn', etfCode })
       })
     },
-    [getWorker]
+    []
   )
 
   // 回测和寻优各用独立 Worker，避免消息处理冲突
