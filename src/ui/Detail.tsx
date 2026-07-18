@@ -240,6 +240,9 @@ export default function Detail() {
       setBtBuy(opt.bestBuy)
       setBtSell(opt.bestSell)
       setBacktestResult(opt.result)
+      const { saveSetting } = await import('../data/db')
+      await saveSetting('buyThreshold', opt.bestBuy)
+      await saveSetting('sellThreshold', opt.bestSell)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
