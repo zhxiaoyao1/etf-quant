@@ -63,12 +63,19 @@ export function runBacktest(
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
   const startIdx = 61
+  let prevPrevScore = 50
   let prevScore = 50
 
   if (bars.length > 60) {
     const initResult = scoreETF(bars.slice(0, 60), weights, thresholds)
     prevScore = initResult.compositeScore
   }
+  if (bars.length > 59) {
+    const initResult2 = scoreETF(bars.slice(0, 59), weights, thresholds)
+    prevPrevScore = initResult2.compositeScore
+  }
+
+  let daysHeld = 0
 
   const closePrices = bars.map(b => b.close)
 
@@ -110,13 +117,18 @@ export function runBacktest(
     const priceTrendUp = maNow > maPrev
     const priceTrendDown = maNow < maPrev
 
-    // 买入：分数穿越买入线 + 价格大趋势向上（震荡上涨也能买）
-    const crossedBuy = prevScore < thresholds.buyThreshold && currentScore >= thresholds.buyThreshold
-    const validBuy = crossedBuy && priceTrendUp
+    // 买入：分数连续2天站上买入线 + 价格大趋势向上（过滤一日脉冲）
+    const confirmedBuy = prevPrevScore < thresholds.buyThreshold && prevScore >= thresholds.buyThreshold && currentScore >= thresholds.buyThreshold
+    const validBuy = confirmedBuy && priceTrendUp
 
-    // 卖出：分数穿越卖出线 + 价格大趋势向下
-    const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
-    const validSell = crossedSell && priceTrendDown
+    // 卖出：分数连续2天跌破卖出线 + 价格大趋势向下
+    const confirmedSell = prevPrevScore > thresholds.sellThreshold && prevScore <= thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
+    let validSell = confirmedSell && priceTrendDown
+
+    // 最小持仓期：买入后3个交易日内不卖出
+    if (validSell && daysHeld < 3) {
+      validSell = false
+    }
 
     // 大盘择时：检查基准ETF的MA5趋势
     let marketOk = true
@@ -138,12 +150,17 @@ export function runBacktest(
         : 1.0
       // 大盘下跌时仓位减半
       if (benchmarkBars && !marketOk) pct *= 0.5
-      const investAmount = cash * pct
+      // 分数冲量：最近几天涨得越快，信号越可信
+      const scoreChange = currentScore - prevPrevScore  // 2-day momentum
+      const momentum = Math.min(2, Math.max(0.5, 1 + scoreChange / 50))
+      // momentum range: 0.5 (slow drift) to 2.0 (explosive breakout)
+      const investAmount = Math.min(cash, cash * pct * momentum)
       shares = investAmount / nextOpen
       cash -= investAmount
       holding = true
       buyPrice = nextOpen
       buyDate = bars[i + 1].date
+      daysHeld = 0
     }
     else if (holding && validSell) {
       // Sell at next day's open
@@ -162,12 +179,17 @@ export function runBacktest(
       })
       shares = 0
       holding = false
+      daysHeld = 0
     }
 
     // Track equity
     const equity = cash + shares * currentPrice
     equityCurve.push({ date: bars[i].date, value: equity })
+
+    // Roll forward score history and holding counter
+    prevPrevScore = prevScore
     prevScore = currentScore
+    if (holding) daysHeld++
   }
 
   // If still holding at end, close position
