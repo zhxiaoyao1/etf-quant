@@ -76,24 +76,25 @@ export function runBacktest(
   }
 
   for (let i = startIdx; i < bars.length - 1; i++) {
-    // 自学习：每21个交易日根据近期准确率调整权重
+    // 自学习：每21个交易日根据近期信心加权准确率调整权重
     if (useLearning && i > startIdx + 21 && (i - startIdx) % 21 === 0) {
       const factorIds = Object.keys(weights)
-      const correct: Record<string, number> = {}
-      const total: Record<string, number> = {}
-      for (const id of factorIds) { correct[id] = 0; total[id] = 0 }
-      // 取最近21天，每天打分并与5天后实际涨跌对比
+      const wScore: Record<string, number> = {}
+      const wConf: Record<string, number> = {}
+      for (const id of factorIds) { wScore[id] = 0; wConf[id] = 0 }
       for (let j = Math.max(startIdx, i - 21); j <= Math.min(i, bars.length - 6); j++) {
         const r = scoreETF(bars.slice(0, j + 1), weights, thresholds)
         const actualUp = bars[j + 5].close > bars[j].close
         for (const fs of r.factorScores) {
-          total[fs.factorId] = (total[fs.factorId] ?? 0) + 1
-          if ((fs.score > 50) === actualUp) correct[fs.factorId] = (correct[fs.factorId] ?? 0) + 1
+          const confidence = Math.abs(fs.score - 50) / 50
+          wConf[fs.factorId] = (wConf[fs.factorId] ?? 0) + confidence
+          wScore[fs.factorId] = (wScore[fs.factorId] ?? 0) + ((fs.score > 50) === actualUp ? confidence : -confidence)
         }
       }
-      // 按准确率重新分配权重（平滑50%）
       const acc: Record<string, number> = {}
-      for (const id of factorIds) acc[id] = total[id] > 0 ? (correct[id] ?? 0) / total[id] : 0.25
+      for (const id of factorIds) {
+        acc[id] = (wConf[id] ?? 0) > 0 ? Math.max(0.05, ((wScore[id] ?? 0) / wConf[id] + 1) / 2) : 0.25
+      }
       const sum = Object.values(acc).reduce((s, v) => s + v, 0) || 1
       for (const id of factorIds) {
         const raw = acc[id] / sum

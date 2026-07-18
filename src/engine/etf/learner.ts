@@ -31,28 +31,30 @@ export function learnFromHistory(
     return { newWeights: { ...oldWeights }, factorAccuracies: {}, sampleCount: 0 }
   }
 
-  // 对每个可验证的交易日打分
-  const correctCount: Record<string, number> = {}
-  for (const id of factorIds) correctCount[id] = 0
+  // 对每个可验证的交易日打分（信心加权）
+  const weightedScore: Record<string, number> = {}  // 累计加权分
+  const totalConfidence: Record<string, number> = {} // 累计信心总量
+  for (const id of factorIds) { weightedScore[id] = 0; totalConfidence[id] = 0 }
   let sampleCount = 0
 
   const maxIdx = bars.length - 1 - verifyDays
   const windowSize = config.lookbackWindow
-  // 取最近 windowSize 个可验证的交易日
   const startIdx = Math.max(60, maxIdx - windowSize)
 
   for (let i = startIdx; i <= maxIdx; i++) {
     const result = scoreETF(bars.slice(0, i + 1), oldWeights)
-    // N 天后实际涨跌
     const futurePrice = bars[i + verifyDays].close
     const currentPrice = bars[i].close
     const actualUp = futurePrice > currentPrice
 
     for (const fs of result.factorScores) {
+      // 信心 = |分数 - 50| / 50，越远离50越有信心
+      const confidence = Math.abs(fs.score - 50) / 50
       const predictedUp = fs.score > 50
-      if (predictedUp === actualUp) {
-        correctCount[fs.factorId] = (correctCount[fs.factorId] ?? 0) + 1
-      }
+      // 猜对加信心分，猜错扣信心分
+      const credit = predictedUp === actualUp ? confidence : -confidence
+      weightedScore[fs.factorId] = (weightedScore[fs.factorId] ?? 0) + credit
+      totalConfidence[fs.factorId] = (totalConfidence[fs.factorId] ?? 0) + confidence
     }
     sampleCount++
   }
@@ -61,10 +63,12 @@ export function learnFromHistory(
     return { newWeights: { ...oldWeights }, factorAccuracies: {}, sampleCount }
   }
 
-  // 计算准确率
+  // 计算信心加权准确率（映射到 0-1 区间）
   const accuracies: Record<string, number> = {}
   for (const id of factorIds) {
-    accuracies[id] = (correctCount[id] ?? 0) / sampleCount
+    const total = totalConfidence[id] ?? 1
+    // 原始分可能是负的，映射到 0-1：accuracy = (weightedScore/total + 1) / 2
+    accuracies[id] = Math.max(0.05, Math.min(0.95, ((weightedScore[id] ?? 0) / total + 1) / 2))
   }
 
   // 按准确率分配新权重
