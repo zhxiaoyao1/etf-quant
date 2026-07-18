@@ -261,9 +261,9 @@ export function optimizeThresholds(
 /** 生成所有有效的权重组合（4因子，每因子10%-50%，步长10%，总和=100%） */
 function* weightCombinations(): Generator<Record<string, number>> {
   const factors = ['trend', 'momentum', 'volatility', 'moneyFlow']
-  for (let w1 = 10; w1 <= 50; w1 += 10) {
-    for (let w2 = 10; w2 <= 50; w2 += 10) {
-      for (let w3 = 10; w3 <= 50; w3 += 10) {
+  for (let w1 = 10; w1 <= 50; w1 += 15) {
+    for (let w2 = 10; w2 <= 50; w2 += 15) {
+      for (let w3 = 10; w3 <= 50; w3 += 15) {
         const w4 = 100 - w1 - w2 - w3
         if (w4 >= 10 && w4 <= 50) {
           yield {
@@ -296,8 +296,8 @@ export function optimizeAll(bars: KLine[]): OptimizeAllResult {
   let tested = 0
 
   for (const w of weightCombinations()) {
-    for (let buy = 55; buy <= 85; buy += 5) {
-      for (let sell = 25; sell <= 45; sell += 5) {
+    for (let buy = 55; buy <= 85; buy += 10) {
+      for (let sell = 25; sell <= 45; sell += 10) {
         tested++
         const result = runBacktest(bars, w, { buyThreshold: buy, sellThreshold: sell })
         if (result.totalTrades >= 3) {
