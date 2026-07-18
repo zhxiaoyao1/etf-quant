@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
-import { getETFList, getKLines, getSignals, getSetting, getWeights } from '../data/db'
+import { getETFList, getKLines, getSignals, getSetting } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
@@ -29,10 +29,6 @@ export default function Detail() {
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
   const [btSell, setBtSell] = useState(40)
-  const [wTrend, setWTrend] = useState(25)
-  const [wMomentum, setWMomentum] = useState(25)
-  const [wVolatility, setWVolatility] = useState(25)
-  const [wMoneyFlow, setWMoneyFlow] = useState(25)
   const [btError, setBtError] = useState('')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -45,14 +41,6 @@ export default function Detail() {
     })
     getSetting<number>('buyThreshold').then(v => { if (v) setBtBuy(v) })
     getSetting<number>('sellThreshold').then(v => { if (v) setBtSell(v) })
-    getWeights('etf').then(w => {
-      if (w) {
-        setWTrend(Math.round(w.trend * 100))
-        setWMomentum(Math.round(w.momentum * 100))
-        setWVolatility(Math.round(w.volatility * 100))
-        setWMoneyFlow(Math.round(w.moneyFlow * 100))
-      }
-    })
   }, [])
 
   useEffect(() => {
@@ -322,8 +310,7 @@ export default function Detail() {
     const ok = await ensureData()
     if (!ok) { setBacktesting(false); return }
     try {
-      const manualWeights = { trend: wTrend/100, momentum: wMomentum/100, volatility: wVolatility/100, moneyFlow: wMoneyFlow/100 }
-      const result = await workerBacktest(selectedETF.code, btBuy, btSell, { manualWeights })
+      const result = await workerBacktest(selectedETF.code, btBuy, btSell)
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -477,38 +464,6 @@ export default function Detail() {
       <button className="analyze-btn" onClick={handleAnalyze} disabled={loading}>
         {loading ? '分析中...' : '\u{1F50D} 分析此ETF'}
       </button>
-
-      {/* 回测阈值调节 */}
-      <div className="backtest-controls">
-        <div className="bt-threshold-row">
-          <label className="bt-label">买入阈值: <span style={{color:'var(--green)'}}>{btBuy}</span></label>
-          <input type="range" min={30} max={95} value={btBuy} onChange={e => setBtBuy(Number(e.target.value))} className="bt-slider" />
-        </div>
-        <div className="bt-threshold-row">
-          <label className="bt-label">卖出阈值: <span style={{color:'var(--red)'}}>{btSell}</span></label>
-          <input type="range" min={10} max={60} value={btSell} onChange={e => setBtSell(Number(e.target.value))} className="bt-slider" />
-        </div>
-      </div>
-
-      {/* 因子权重 */}
-      <div className="backtest-controls">
-        <div className="bt-threshold-row">
-          <label className="bt-label">趋势: <span>{wTrend}%</span></label>
-          <input type="range" min={5} max={50} step={5} value={wTrend} onChange={e => setWTrend(Number(e.target.value))} className="bt-slider" />
-        </div>
-        <div className="bt-threshold-row">
-          <label className="bt-label">动量: <span>{wMomentum}%</span></label>
-          <input type="range" min={5} max={50} step={5} value={wMomentum} onChange={e => setWMomentum(Number(e.target.value))} className="bt-slider" />
-        </div>
-        <div className="bt-threshold-row">
-          <label className="bt-label">波动率: <span>{wVolatility}%</span></label>
-          <input type="range" min={5} max={50} step={5} value={wVolatility} onChange={e => setWVolatility(Number(e.target.value))} className="bt-slider" />
-        </div>
-        <div className="bt-threshold-row">
-          <label className="bt-label">资金流: <span>{wMoneyFlow}%</span></label>
-          <input type="range" min={5} max={50} step={5} value={wMoneyFlow} onChange={e => setWMoneyFlow(Number(e.target.value))} className="bt-slider" />
-        </div>
-      </div>
 
       {btError && (
         <div className="backtest-hint">{btError}</div>
