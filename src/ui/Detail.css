@@ -140,6 +140,16 @@
   cursor: pointer;
 }
 .optimize-all-btn:disabled { opacity: 0.4; }
+.learn-btn {
+  padding: 12px;
+  background: #1a2332;
+  color: var(--yellow);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.learn-btn:disabled { opacity: 0.4; }
 .backtest-controls {
   background: var(--bg-card);
   border: 1px solid var(--border);

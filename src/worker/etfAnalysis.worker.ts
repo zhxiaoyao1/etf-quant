@@ -1,9 +1,9 @@
 import type { Signal, ETFInfo, SignalThresholds, LearningConfig, LearningLog } from '../types'
 import { scoreETF } from '../engine/etf/scorer'
-import { adjustWeights } from '../engine/etf/learner'
+import { learnFromHistory } from '../engine/etf/learner'
 import { runBacktest, optimizeThresholds, optimizeAll } from '../engine/etf/backtest'
 import { fetchAllETFs } from '../data/etfFetcher'
-import { getKLines, saveKLines, saveSignal, getSignals, getWeights, saveWeights, saveLearningLog, getSetting } from '../data/db'
+import { getKLines, saveKLines, saveSignal, getWeights, saveWeights, saveLearningLog, getSetting } from '../data/db'
 import { DEFAULT_ETF_WEIGHTS, DEFAULT_SIGNAL_THRESHOLDS, DEFAULT_LEARNING_CONFIG } from '../config/defaults'
 
 type WorkerMessage =
@@ -65,19 +65,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     } else if (msg.type === 'learn') {
       const { etfCode, config } = msg
       const cfg = config ?? DEFAULT_LEARNING_CONFIG
-      const signals = await getSignals({ etfCode, limit: cfg.lookbackWindow })
       const oldWeights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
       const bars = await getKLines(etfCode)
-      if (bars.length < 2) {
-        self.postMessage({ type: 'error', message: 'Not enough K-line data' })
+      if (bars.length < 70) {
+        self.postMessage({ type: 'error', message: `数据不足：${bars.length}天，需≥70天` })
         return
       }
-      const recent5 = bars.slice(-5)
-      const prev5 = bars.slice(-10, -5)
-      const recentAvg = recent5.reduce((s, b) => s + b.close, 0) / recent5.length
-      const prevAvg = prev5.reduce((s, b) => s + b.close, 0) / prev5.length
-      const actualOutcome = recentAvg > prevAvg ? 'up' : 'down'
-      const result = adjustWeights(signals, actualOutcome, oldWeights, cfg)
+      const result = learnFromHistory(bars, oldWeights, cfg, 5)
       await saveWeights('etf', result.newWeights)
       const log: LearningLog = {
         id: `learn-etf-${etfCode}-${new Date().toISOString().slice(0, 10)}`,

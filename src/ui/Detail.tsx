@@ -23,7 +23,7 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, optimizeAll: workerOptimizeAll } = useETFWorker()
+  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, optimizeAll: workerOptimizeAll, learn: workerLearn } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
@@ -276,6 +276,22 @@ export default function Detail() {
     }
   }
 
+  const handleLearn = async () => {
+    if (!selectedETF) return
+    setBtError('')
+    setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
+    try {
+      await workerLearn(selectedETF.code)
+      setBtError('✅ 自学习完成，权重已更新。因子仪表盘可查看详情')
+    } catch (err: any) {
+      setBtError(err?.message || '自学习失败')
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
   const handleAnalyze = async () => {
     if (!selectedETF) return
     const newSignals = await analyze([selectedETF])
@@ -481,6 +497,13 @@ export default function Detail() {
           disabled={backtesting}
         >
           🧬 寻优权重+阈值
+        </button>
+        <button
+          className="learn-btn"
+          onClick={handleLearn}
+          disabled={backtesting}
+        >
+          🧠 从历史学习
         </button>
       </div>
     </div>
