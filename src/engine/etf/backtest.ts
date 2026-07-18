@@ -33,7 +33,8 @@ export interface BacktestResult {
  * @param initialCapital Starting capital (default: 100000)
  */
 export interface BacktestOptions {
-  useLearning?: boolean   // 每21天自动学习调整权重
+  useLearning?: boolean     // 每21天自动学习调整权重
+  positionSizing?: boolean  // 根据信号强度动态仓位（非满仓进出）
 }
 
 export function runBacktest(
@@ -43,7 +44,7 @@ export function runBacktest(
   initialCapital: number = 100000,
   options: BacktestOptions = {}
 ): BacktestResult {
-  const { useLearning = false } = options
+  const { useLearning = false, positionSizing = false } = options
   if (bars.length < 80) {
     return {
       totalReturn: 0, annualizedReturn: 0, maxDrawdown: 0,
@@ -123,8 +124,13 @@ export function runBacktest(
 
     if (!holding && validBuy) {
       const nextOpen = bars[i + 1].open
-      shares = cash / nextOpen
-      cash = 0
+      // 仓位：分数越高仓位越重，最低30%，最高100%
+      const pct = positionSizing
+        ? Math.min(1.0, Math.max(0.3, (currentScore - thresholds.buyThreshold) / (100 - thresholds.buyThreshold) * 0.7 + 0.3))
+        : 1.0
+      const investAmount = cash * pct
+      shares = investAmount / nextOpen
+      cash -= investAmount
       holding = true
       buyPrice = nextOpen
       buyDate = bars[i + 1].date

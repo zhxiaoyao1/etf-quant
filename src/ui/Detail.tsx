@@ -29,6 +29,7 @@ export default function Detail() {
   const [btBuy, setBtBuy] = useState(70)
   const [btSell, setBtSell] = useState(40)
   const [btLearning, setBtLearning] = useState(false)
+  const [btPosSize, setBtPosSize] = useState(false)
   const [btError, setBtError] = useState('')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -311,7 +312,7 @@ export default function Detail() {
     const ok = await ensureData()
     if (!ok) { setBacktesting(false); return }
     try {
-      const result = await workerBacktest(selectedETF.code, btBuy, btSell, { useLearning: btLearning })
+      const result = await workerBacktest(selectedETF.code, btBuy, btSell, { useLearning: btLearning, positionSizing: btPosSize })
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -403,7 +404,7 @@ export default function Detail() {
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            买入≥{btBuy} 卖出&lt;{btSell}
+            买入≥{btBuy} 卖出&lt;{btSell}{btLearning ? ' · 自学习' : ''}{btPosSize ? ' · 仓位管理' : ''}
             {backtestResult.finalWeights ? (
               <span> · 学习后权重：趋势{(backtestResult.finalWeights.trend * 100).toFixed(0)}% 动量{(backtestResult.finalWeights.momentum * 100).toFixed(0)}% 波动{(backtestResult.finalWeights.volatility * 100).toFixed(0)}% 资金{(backtestResult.finalWeights.moneyFlow * 100).toFixed(0)}%</span>
             ) : backtestResult.weights ? (
@@ -485,6 +486,10 @@ export default function Detail() {
       <div className="bt-learning-toggle" onClick={() => setBtLearning(!btLearning)}>
         <span className={`toggle-dot${btLearning ? ' on' : ''}`}>{btLearning ? '🟢' : '⚪'}</span>
         <span>自学习模式：回测中每21天自动调整权重</span>
+      </div>
+      <div className="bt-learning-toggle" onClick={() => setBtPosSize(!btPosSize)}>
+        <span className={`toggle-dot${btPosSize ? ' on' : ''}`}>{btPosSize ? '🟢' : '⚪'}</span>
+        <span>仓位管理：信号越强仓位越重（30%-100%）</span>
       </div>
       <div className="bt-buttons">
         <button
