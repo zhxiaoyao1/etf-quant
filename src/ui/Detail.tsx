@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
-import { getETFList, getKLines, getSignals } from '../data/db'
+import { getETFList, getKLines, getSignals, getSetting } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import './Detail.css'
 
@@ -38,6 +38,8 @@ export default function Detail() {
     getETFList().then(list => {
       if (list.length > 0) { setEtfs(list); setSelectedETF(list[0]) }
     })
+    getSetting<number>('buyThreshold').then(v => { if (v) setBtBuy(v) })
+    getSetting<number>('sellThreshold').then(v => { if (v) setBtSell(v) })
   }, [])
 
   useEffect(() => {
