@@ -34,6 +34,8 @@ export default function Detail() {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
   const candleSeriesRef = useRef<any>(null)
+  const equityChartRef = useRef<HTMLDivElement>(null)
+  const equityChartInstance = useRef<any>(null)
 
   useEffect(() => {
     getETFList().then(list => {
@@ -207,6 +209,36 @@ export default function Detail() {
       }
     }
     series.setMarkers(markers)
+  }, [backtestResult])
+
+  // 权益曲线图
+  useEffect(() => {
+    if (!backtestResult?.equityCurve?.length || !equityChartRef.current) return
+    if (equityChartInstance.current) equityChartInstance.current.remove()
+    const container = equityChartRef.current
+    const chart = createChart(container, {
+      layout: { background: { color: '#0d1117' }, textColor: '#8b949e' },
+      grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+      timeScale: { borderColor: '#30363d', timeVisible: false },
+      rightPriceScale: { borderColor: '#30363d' },
+      crosshair: { mode: CrosshairMode.Normal },
+      width: container.clientWidth,
+      height: 180,
+    })
+    const areaSeries = chart.addAreaSeries({
+      lineColor: '#58a6ff', topColor: 'rgba(88,166,255,0.3)', bottomColor: 'rgba(88,166,255,0.02)',
+      lineWidth: 2,
+    })
+    areaSeries.setData(backtestResult.equityCurve.map((p: any) => ({ time: p.date, value: p.value })))
+    // 初始资金参考线
+    const initLine = chart.addLineSeries({ color: '#8b949e', lineWidth: 1, lineStyle: 2 })
+    initLine.setData([
+      { time: backtestResult.equityCurve[0].date, value: 100000 },
+      { time: backtestResult.equityCurve[backtestResult.equityCurve.length - 1].date, value: 100000 },
+    ])
+    chart.timeScale().fitContent()
+    equityChartInstance.current = chart
+    return () => { chart.remove(); equityChartInstance.current = null }
   }, [backtestResult])
 
   // 确保数据足够，不够就自动拉取
@@ -458,6 +490,7 @@ export default function Detail() {
               </span>
             </div>
           </div>
+          <div ref={equityChartRef} className="equity-chart" />
         </div>
       )}
 
