@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import type { ETFInfo } from '../types'
-import { DEFAULT_SIGNAL_THRESHOLDS, DEFAULT_LEARNING_CONFIG, DEFAULT_ETF_LIST } from '../config/defaults'
+import { DEFAULT_SIGNAL_THRESHOLDS, DEFAULT_ETF_LIST } from '../config/defaults'
 import { saveSetting, getSetting, exportAllData, importAllData, getETFList, saveETFList } from '../data/db'
 import './Settings.css'
 
 export default function Settings() {
   const [buyThreshold, setBuyThreshold] = useState(DEFAULT_SIGNAL_THRESHOLDS.buyThreshold)
   const [sellThreshold, setSellThreshold] = useState(DEFAULT_SIGNAL_THRESHOLDS.sellThreshold)
-  const [learningRate, setLearningRate] = useState(DEFAULT_LEARNING_CONFIG.learningRate)
-  const [lookbackWindow, setLookbackWindow] = useState(DEFAULT_LEARNING_CONFIG.lookbackWindow)
   const [etfs, setEtfs] = useState<ETFInfo[]>([])
   const [newCode, setNewCode] = useState('')
   const [newName, setNewName] = useState('')
@@ -20,14 +18,10 @@ export default function Settings() {
     Promise.all([
       getSetting<number>('buyThreshold'),
       getSetting<number>('sellThreshold'),
-      getSetting<number>('learningRate'),
-      getSetting<number>('lookbackWindow'),
       getETFList(),
-    ]).then(([bt, st, lr, lw, list]) => {
+    ]).then(([bt, st, list]) => {
       if (bt != null) setBuyThreshold(bt)
       if (st != null) setSellThreshold(st)
-      if (lr != null) setLearningRate(lr)
-      if (lw != null) setLookbackWindow(lw)
       if (list.length > 0) setEtfs(list)
       else setEtfs(DEFAULT_ETF_LIST)
     })
@@ -42,8 +36,6 @@ export default function Settings() {
     await Promise.all([
       saveSetting('buyThreshold', buyThreshold),
       saveSetting('sellThreshold', sellThreshold),
-      saveSetting('learningRate', learningRate),
-      saveSetting('lookbackWindow', lookbackWindow),
       saveETFList(etfs),
     ])
     showMessage('设置已保存')
@@ -121,33 +113,6 @@ export default function Settings() {
             onChange={e => setSellThreshold(Number(e.target.value))}
           />
           <span className="setting-value">{sellThreshold}</span>
-        </div>
-      </div>
-
-      <div className="settings-section">
-        <h3>学习参数</h3>
-        <div className="setting-row">
-          <label>学习率</label>
-          <input
-            type="range"
-            min={0.1}
-            max={1.0}
-            step={0.05}
-            value={learningRate}
-            onChange={e => setLearningRate(Number(e.target.value))}
-          />
-          <span className="setting-value">{learningRate.toFixed(2)}</span>
-        </div>
-        <div className="setting-row">
-          <label>回溯窗口</label>
-          <input
-            type="range"
-            min={5}
-            max={50}
-            value={lookbackWindow}
-            onChange={e => setLookbackWindow(Number(e.target.value))}
-          />
-          <span className="setting-value">{lookbackWindow}</span>
         </div>
       </div>
 

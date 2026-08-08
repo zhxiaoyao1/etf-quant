@@ -33,42 +33,6 @@ export function useETFWorker() {
     []
   )
 
-  const fetchAndStore = useCallback(
-    (etfs: ETFInfo[]): Promise<number> => {
-      return new Promise((resolve, reject) => {
-        const worker = createWorker()
-        setLoading(true)
-        worker.onmessage = (e) => {
-          setLoading(false)
-          worker.terminate()
-          if (e.data.type === 'fetchComplete') resolve(e.data.count)
-          else if (e.data.type === 'error') reject(new Error(e.data.message))
-        }
-        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'fetchAndStore', etfs })
-      })
-    },
-    []
-  )
-
-  const analyze = useCallback(
-    (etfs: ETFInfo[]): Promise<Signal[]> => {
-      return new Promise((resolve, reject) => {
-        const worker = createWorker()
-        setLoading(true)
-        worker.onmessage = (e) => {
-          setLoading(false)
-          worker.terminate()
-          if (e.data.type === 'analysisComplete') resolve(e.data.signals)
-          else if (e.data.type === 'error') reject(new Error(e.data.message))
-        }
-        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'analyze', etfs })
-      })
-    },
-    []
-  )
-
   const learn = useCallback(
     (etfCode: string): Promise<LearningLog> => {
       return new Promise((resolve, reject) => {
@@ -88,7 +52,7 @@ export function useETFWorker() {
   )
 
   const backtest = useCallback(
-    (etfCode: string, buyThreshold: number, sellThreshold: number, options?: Record<string, any>, benchmarkCode?: string): Promise<any> => {
+    (etfCode: string, buyThreshold: number, sellThreshold: number): Promise<any> => {
       return new Promise((resolve, reject) => {
         const worker = createWorker()
         setLoading(true)
@@ -99,25 +63,7 @@ export function useETFWorker() {
           else if (e.data.type === 'error') reject(new Error(e.data.message))
         }
         worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'backtest', etfCode, buyThreshold, sellThreshold, options, benchmarkCode })
-      })
-    },
-    []
-  )
-
-  const optimize = useCallback(
-    (etfCode: string): Promise<{ bestBuy: number; bestSell: number; result: any }> => {
-      return new Promise((resolve, reject) => {
-        const worker = createWorker()
-        setLoading(true)
-        worker.onmessage = (e) => {
-          setLoading(false)
-          worker.terminate()
-          if (e.data.type === 'optimizeResult') resolve({ bestBuy: e.data.bestBuy, bestSell: e.data.bestSell, result: e.data.result })
-          else if (e.data.type === 'error') reject(new Error(e.data.message))
-        }
-        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'optimize', etfCode })
+        worker.postMessage({ type: 'backtest', etfCode, buyThreshold, sellThreshold })
       })
     },
     []
@@ -141,5 +87,5 @@ export function useETFWorker() {
     []
   )
 
-  return { refresh, fetchAndStore, analyze, learn, backtest, optimize, optimizeAll, loading }
+  return { refresh, learn, backtest, optimizeAll, loading }
 }
