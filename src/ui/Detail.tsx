@@ -1,22 +1,37 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createChart, CrosshairMode } from 'lightweight-charts'
+import { createChart, CrosshairMode, LineStyle } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
-import { getETFList, getKLines, getSignals, getSetting } from '../data/db'
+import { getETFList, getKLines, getSignals, getSetting, saveWeights, saveSetting } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
 
-function calcMA(data: { time: string; value: number }[], period: number): { time: string; value: number }[] {
-  const result: { time: string; value: number }[] = []
+function calcBollinger(
+  data: { time: string; value: number }[],
+  period: number,
+  stdDev: number
+): {
+  upper: { time: string; value: number }[]
+  middle: { time: string; value: number }[]
+  lower: { time: string; value: number }[]
+} {
+  const middle: { time: string; value: number }[] = []
+  const upper: { time: string; value: number }[] = []
+  const lower: { time: string; value: number }[] = []
   for (let i = period - 1; i < data.length; i++) {
     let sum = 0
-    for (let j = i - period + 1; j <= i; j++) {
-      sum += data[j].value
-    }
-    result.push({ time: data[i].time, value: sum / period })
+    for (let j = i - period + 1; j <= i; j++) sum += data[j].value
+    const mean = sum / period
+    let variance = 0
+    for (let j = i - period + 1; j <= i; j++) variance += (data[j].value - mean) ** 2
+    const std = Math.sqrt(variance / period)
+    const t = data[i].time
+    middle.push({ time: t, value: mean })
+    upper.push({ time: t, value: mean + stdDev * std })
+    lower.push({ time: t, value: mean - stdDev * std })
   }
-  return result
+  return { upper, middle, lower }
 }
 
 export default function Detail() {
@@ -24,7 +39,7 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { analyze, loading, fetchAndStore, backtest: workerBacktest, optimize: workerOptimize, optimizeAll: workerOptimizeAll, learn: workerLearn } = useETFWorker()
+  const { refresh, loading, backtest: workerBacktest, optimizeAll: workerOptimizeAll, learn: workerLearn } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btBuy, setBtBuy] = useState(70)
@@ -122,34 +137,15 @@ export default function Detail() {
       value: bar.close,
     }))
 
-    // MA5 (yellow)
-    if (bars.length >= 5) {
-      const ma5Data = calcMA(closeSeries, 5)
-      const ma5Series = chart.addLineSeries({
-        color: '#e5c73c',
-        lineWidth: 1,
-      })
-      ma5Series.setData(ma5Data)
-    }
-
-    // MA20 (blue)
+    // BOLL(20,2) 布林带：中轨（实线）+ 上/下轨（虚线）
     if (bars.length >= 20) {
-      const ma20Data = calcMA(closeSeries, 20)
-      const ma20Series = chart.addLineSeries({
-        color: '#58a6ff',
-        lineWidth: 1,
-      })
-      ma20Series.setData(ma20Data)
-    }
-
-    // MA60 (purple)
-    if (bars.length >= 60) {
-      const ma60Data = calcMA(closeSeries, 60)
-      const ma60Series = chart.addLineSeries({
-        color: '#bc8cff',
-        lineWidth: 1,
-      })
-      ma60Series.setData(ma60Data)
+      const { upper, middle, lower } = calcBollinger(closeSeries, 20, 2)
+      const midSeries = chart.addLineSeries({ color: '#58a6ff', lineWidth: 1 })
+      midSeries.setData(middle)
+      const upperSeries = chart.addLineSeries({ color: '#bc8cff', lineWidth: 1, lineStyle: LineStyle.Dashed })
+      upperSeries.setData(upper)
+      const lowerSeries = chart.addLineSeries({ color: '#bc8cff', lineWidth: 1, lineStyle: LineStyle.Dashed })
+      lowerSeries.setData(lower)
     }
 
     chart.timeScale().fitContent()
@@ -218,7 +214,7 @@ export default function Detail() {
     if (bars.length >= 80) return true
     setBtError('K线数据不足，正在自动拉取...')
     try {
-      await fetchAndStore([selectedETF])
+      await refresh([selectedETF])
       const fresh = await getKLines(selectedETF.code)
       setBars(fresh)
       if (fresh.length < 80) {
@@ -233,30 +229,6 @@ export default function Detail() {
     }
   }
 
-  const handleOptimize = async () => {
-    if (!selectedETF) return
-    setBtError('')
-    setBacktesting(true)
-    const ok = await ensureData()
-    if (!ok) { setBacktesting(false); return }
-    try {
-      const opt = await workerOptimize(selectedETF.code)
-      setBtBuy(opt.bestBuy)
-      setBtSell(opt.bestSell)
-      setBacktestResult(opt.result)
-      const { saveSetting } = await import('../data/db')
-      await saveSetting('buyThreshold', opt.bestBuy)
-      await saveSetting('sellThreshold', opt.bestSell)
-      setTimeout(() => {
-        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
-    } catch (err: any) {
-      setBtError(err?.message || '寻优失败，请重试')
-    } finally {
-      setBacktesting(false)
-    }
-  }
-
   const handleOptimizeAll = async () => {
     if (!selectedETF) return
     setBtError('')
@@ -268,7 +240,6 @@ export default function Detail() {
       setBtBuy(opt.bestBuy)
       setBtSell(opt.bestSell)
       setBacktestResult(opt.result)
-      const { saveWeights, saveSetting } = await import('../data/db')
       await saveWeights('etf', opt.bestWeights)
       await saveSetting('buyThreshold', opt.bestBuy)
       await saveSetting('sellThreshold', opt.bestSell)
@@ -300,7 +271,7 @@ export default function Detail() {
 
   const handleAnalyze = async () => {
     if (!selectedETF) return
-    const newSignals = await analyze([selectedETF])
+    const newSignals = await refresh([selectedETF])
     if (newSignals.length > 0) {
       setSignals(prev => [newSignals[0], ...prev].slice(0, 20))
     }
@@ -366,9 +337,8 @@ export default function Detail() {
         <>
           <div ref={chartContainerRef} className="chart-container" />
           <div className="ma-legend">
-            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#e5c73c'}} /> MA5</span>
-            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#58a6ff'}} /> MA20</span>
-            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#bc8cff'}} /> MA60</span>
+            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#58a6ff'}} /> 中轨(20)</span>
+            <span className="ma-legend-item"><span className="ma-dot" style={{background:'#bc8cff'}} /> 上/下轨</span>
             {backtestResult && backtestResult.totalTrades > 0 && (
               <>
                 <span className="ma-legend-item"><span className="ma-dot" style={{background:'var(--green)'}} /> 买点</span>
@@ -405,11 +375,6 @@ export default function Detail() {
           </div>
           <div className="backtest-params">
             买入≥{btBuy} 卖出&lt;{btSell}
-            {backtestResult.finalWeights ? (
-              <span> · 学习后权重：趋势{(backtestResult.finalWeights.trend * 100).toFixed(0)}% 动量{(backtestResult.finalWeights.momentum * 100).toFixed(0)}% 波动{(backtestResult.finalWeights.volatility * 100).toFixed(0)}% 资金{(backtestResult.finalWeights.moneyFlow * 100).toFixed(0)}%</span>
-            ) : backtestResult.weights ? (
-              <span> · 权重：趋势{(backtestResult.weights.trend * 100).toFixed(0)}% 动量{(backtestResult.weights.momentum * 100).toFixed(0)}% 波动{(backtestResult.weights.volatility * 100).toFixed(0)}% 资金{(backtestResult.weights.moneyFlow * 100).toFixed(0)}%</span>
-            ) : null}
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">
@@ -479,13 +444,6 @@ export default function Detail() {
           disabled={backtesting}
         >
           {backtesting ? '⏳ 计算中...' : '📊 回测'}
-        </button>
-        <button
-          className="optimize-btn"
-          onClick={handleOptimize}
-          disabled={backtesting}
-        >
-          🤖 寻优阈值
         </button>
         <button
           className="optimize-all-btn"
