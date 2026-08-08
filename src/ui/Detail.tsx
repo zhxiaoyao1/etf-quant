@@ -34,6 +34,23 @@ function calcBollinger(
   return { upper, middle, lower }
 }
 
+/** 布林带宽（%）：(上轨-下轨)/中轨×100，衡量波动扩张/收窄 */
+function calcBandWidth(bars: KLine[], period = 20, stdDev = 2): { time: string; value: number }[] {
+  const width: { time: string; value: number }[] = []
+  for (let i = period - 1; i < bars.length; i++) {
+    const slice = bars.slice(i - period + 1, i + 1)
+    const closes = slice.map(b => b.close)
+    const mean = closes.reduce((s, v) => s + v, 0) / period
+    if (mean <= 0) continue
+    const variance = closes.reduce((s, v) => s + (v - mean) ** 2, 0) / period
+    const std = Math.sqrt(variance)
+    const upper = mean + stdDev * std
+    const lower = mean - stdDev * std
+    width.push({ time: bars[i].date, value: ((upper - lower) / mean) * 100 })
+  }
+  return width
+}
+
 export default function Detail() {
   const [etfs, setEtfs] = useState<ETFInfo[]>(DEFAULT_ETF_LIST)
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
@@ -47,6 +64,8 @@ export default function Detail() {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
   const candleSeriesRef = useRef<any>(null)
+  const bandContainerRef = useRef<HTMLDivElement>(null)
+  const bandChartRef = useRef<ReturnType<typeof createChart> | null>(null)
 
   useEffect(() => {
     getETFList().then(list => {
@@ -172,6 +191,59 @@ export default function Detail() {
     }
   }, [renderChart])
 
+  // 布林带宽指示器：独立展示带宽收窄/扩张（不参与策略）
+  useEffect(() => {
+    const container = bandContainerRef.current
+    if (!container || bars.length < 20) return
+    if (bandChartRef.current) {
+      bandChartRef.current.remove()
+      bandChartRef.current = null
+    }
+    const widthData = calcBandWidth(bars)
+    if (widthData.length === 0) return
+
+    const chart = createChart(container, {
+      layout: { background: { color: '#0d1117' }, textColor: '#8b949e' },
+      grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+      timeScale: {
+        borderColor: '#30363d', timeVisible: false, secondsVisible: false,
+        rightOffset: 0, fixLeftEdge: true, fixRightEdge: true, lockVisibleTimeRangeOnResize: true,
+      },
+      rightPriceScale: { borderColor: '#30363d', scaleMargins: { top: 0.15, bottom: 0.15 } },
+      leftPriceScale: { visible: false },
+      handleScroll: { vertTouchDrag: false },
+      width: container.clientWidth,
+      height: 70,
+    })
+
+    const wSeries = chart.addLineSeries({ color: '#58a6ff', lineWidth: 1 })
+    wSeries.setData(widthData)
+
+    // 20日平均带宽（虚线参考线）
+    if (widthData.length >= 20) {
+      const avgData = widthData.slice(19).map((p, idx) => {
+        const win = widthData.slice(idx, idx + 20)
+        return { time: p.time, value: win.reduce((s, w) => s + w.value, 0) / win.length }
+      })
+      const avgSeries = chart.addLineSeries({ color: '#bc8cff', lineWidth: 1, lineStyle: LineStyle.Dashed })
+      avgSeries.setData(avgData)
+    }
+
+    chart.timeScale().fitContent()
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        chart.applyOptions({ width: entry.contentRect.width, height: entry.contentRect.height })
+      }
+    })
+    resizeObserver.observe(container)
+    bandChartRef.current = chart
+
+    return () => {
+      resizeObserver.disconnect()
+      chart.remove()
+    }
+  }, [bars])
+
   // 回测结果 → K线图上标注买卖点
   useEffect(() => {
     const series = candleSeriesRef.current
@@ -251,6 +323,14 @@ export default function Detail() {
 
   const latestSignal = signals[0]
 
+  // 当前带宽状态：当前带宽 vs 近20日均值 → 扩张/收窄
+  const widthData = calcBandWidth(bars)
+  const curWidth = widthData.length > 0 ? widthData[widthData.length - 1].value : null
+  const avgWidth = widthData.length >= 20
+    ? widthData.slice(-20).reduce((s, w) => s + w.value, 0) / 20
+    : curWidth
+  const bandExpanding = curWidth != null && avgWidth != null && curWidth > avgWidth
+
   return (
     <div className="detail">
       <select className="etf-selector" value={selectedETF?.code ?? ''} onChange={e => {
@@ -286,6 +366,18 @@ export default function Detail() {
               </>
             )}
           </div>
+          {bars.length >= 20 && (
+            <>
+              <div ref={bandContainerRef} className="band-chart-container" />
+              <div className="ma-legend">
+                <span className="band-state" style={{ color: bandExpanding ? 'var(--green)' : 'var(--yellow)', fontWeight: 700 }}>
+                  带宽 {curWidth != null ? curWidth.toFixed(2) : '--'}% {bandExpanding ? '↑扩张' : '↓收窄'}
+                </span>
+                <span className="ma-legend-item"><span className="ma-dot" style={{background:'#58a6ff'}} /> 带宽</span>
+                <span className="ma-legend-item"><span className="ma-dot" style={{background:'#bc8cff'}} /> 20日均值</span>
+              </div>
+            </>
+          )}
         </>
       ) : (
         <div className="chart-placeholder">
@@ -314,7 +406,7 @@ export default function Detail() {
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            收盘价 &gt; MA20 买入 · &lt; MA20 卖出
+            收盘价&gt;MA20且带宽扩张买入 · &lt;MA20卖出
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">

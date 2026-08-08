@@ -1,5 +1,5 @@
 import type { KLine } from '../../types'
-import { sma } from '../common'
+import { sma, bollingerWidth, bandExpanding } from '../common'
 import { MA_PERIOD } from './trendSignal'
 
 export interface BacktestTrade {
@@ -25,8 +25,8 @@ export interface BacktestResult {
 }
 
 /**
- * 最简均线策略回测：
- * - 买入：收盘价 > MA20 → 次日开盘满仓
+ * 均线 + 布林带宽策略回测：
+ * - 买入：收盘价 > MA20 且 带宽扩张（趋势启动）→ 次日开盘满仓
  * - 卖出：收盘价 < MA20 → 次日开盘清仓
  * @param bars K线数据（按日期升序）
  * @param maPeriod 均线周期（默认 20）
@@ -53,12 +53,14 @@ export function runBacktest(
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
   const closes = bars.map(b => b.close)
+  const widths = bollingerWidth(bars, maPeriod)
 
   for (let i = maPeriod; i < bars.length - 1; i++) {
     const ma = sma(closes.slice(0, i + 1), maPeriod)
     const above = closes[i] > ma
+    const expanding = bandExpanding(widths, i)
 
-    if (!holding && above) {
+    if (!holding && above && expanding) {
       const nextOpen = bars[i + 1].open
       shares = cash / nextOpen
       cash = 0
