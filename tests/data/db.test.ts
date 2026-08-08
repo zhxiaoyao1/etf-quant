@@ -43,12 +43,8 @@ describe('Signal CRUD', () => {
       id: 'test-1',
       etfCode: '510300',
       date: '2026-07-15',
-      compositeScore: 82,
+      score: 82,
       signal: 'buy',
-      factorScores: [
-        { factorId: 'trend', name: '趋势', score: 85 },
-      ],
-      weights: { trend: 1.0 },
     }
     await saveSignal(signal)
     const results = await getSignals({ etfCode: '510300', limit: 10 })

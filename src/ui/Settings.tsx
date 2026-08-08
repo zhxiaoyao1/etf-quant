@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import type { ETFInfo } from '../types'
-import { DEFAULT_SIGNAL_THRESHOLDS, DEFAULT_ETF_LIST } from '../config/defaults'
-import { saveSetting, getSetting, exportAllData, importAllData, getETFList, saveETFList } from '../data/db'
+import { DEFAULT_ETF_LIST } from '../config/defaults'
+import { exportAllData, importAllData, getETFList, saveETFList } from '../data/db'
 import './Settings.css'
 
 export default function Settings() {
-  const [buyThreshold, setBuyThreshold] = useState(DEFAULT_SIGNAL_THRESHOLDS.buyThreshold)
-  const [sellThreshold, setSellThreshold] = useState(DEFAULT_SIGNAL_THRESHOLDS.sellThreshold)
   const [etfs, setEtfs] = useState<ETFInfo[]>([])
   const [newCode, setNewCode] = useState('')
   const [newName, setNewName] = useState('')
@@ -15,13 +13,7 @@ export default function Settings() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    Promise.all([
-      getSetting<number>('buyThreshold'),
-      getSetting<number>('sellThreshold'),
-      getETFList(),
-    ]).then(([bt, st, list]) => {
-      if (bt != null) setBuyThreshold(bt)
-      if (st != null) setSellThreshold(st)
+    getETFList().then(list => {
       if (list.length > 0) setEtfs(list)
       else setEtfs(DEFAULT_ETF_LIST)
     })
@@ -33,11 +25,7 @@ export default function Settings() {
   }
 
   const handleSave = async () => {
-    await Promise.all([
-      saveSetting('buyThreshold', buyThreshold),
-      saveSetting('sellThreshold', sellThreshold),
-      saveETFList(etfs),
-    ])
+    await saveETFList(etfs)
     showMessage('设置已保存')
   }
 
@@ -89,32 +77,6 @@ export default function Settings() {
       <h2>设置</h2>
 
       {message && <div className="settings-message">{message}</div>}
-
-      <div className="settings-section">
-        <h3>信号阈值</h3>
-        <div className="setting-row">
-          <label>买入阈值</label>
-          <input
-            type="range"
-            min={30}
-            max={95}
-            value={buyThreshold}
-            onChange={e => setBuyThreshold(Number(e.target.value))}
-          />
-          <span className="setting-value">{buyThreshold}</span>
-        </div>
-        <div className="setting-row">
-          <label>卖出阈值</label>
-          <input
-            type="range"
-            min={10}
-            max={60}
-            value={sellThreshold}
-            onChange={e => setSellThreshold(Number(e.target.value))}
-          />
-          <span className="setting-value">{sellThreshold}</span>
-        </div>
-      </div>
 
       <div className="settings-section">
         <h3>ETF 自选列表</h3>

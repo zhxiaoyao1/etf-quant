@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createChart, CrosshairMode, LineStyle } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
-import { getETFList, getKLines, getSignals, getSetting, saveWeights, saveSetting } from '../data/db'
+import { getETFList, getKLines, getSignals } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
@@ -39,24 +39,19 @@ export default function Detail() {
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { refresh, loading, backtest: workerBacktest, optimizeAll: workerOptimizeAll, learn: workerLearn } = useETFWorker()
+  const { refresh, loading, backtest: workerBacktest } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
-  const [btBuy, setBtBuy] = useState(70)
-  const [btSell, setBtSell] = useState(40)
   const [btError, setBtError] = useState('')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
   const candleSeriesRef = useRef<any>(null)
 
-
   useEffect(() => {
     getETFList().then(list => {
       if (list.length > 0) { setEtfs(list); setSelectedETF(list[0]) }
     })
-    getSetting<number>('buyThreshold').then(v => { if (v) setBtBuy(v) })
-    getSetting<number>('sellThreshold').then(v => { if (v) setBtSell(v) })
   }, [])
 
   useEffect(() => {
@@ -206,19 +201,17 @@ export default function Detail() {
     series.setMarkers(markers)
   }, [backtestResult])
 
-
-
   // 确保数据足够，不够就自动拉取
   const ensureData = async (): Promise<boolean> => {
     if (!selectedETF) return false
-    if (bars.length >= 80) return true
+    if (bars.length >= 40) return true
     setBtError('K线数据不足，正在自动拉取...')
     try {
       await refresh([selectedETF])
       const fresh = await getKLines(selectedETF.code)
       setBars(fresh)
-      if (fresh.length < 80) {
-        setBtError(`数据不足：仅${fresh.length}天K线（需≥80天）。请先点上方「刷新」按钮拉取数据。`)
+      if (fresh.length < 40) {
+        setBtError(`数据不足：仅${fresh.length}天K线（需≥40天）。请先点上方「刷新」按钮拉取数据。`)
         return false
       }
       setBtError('')
@@ -226,46 +219,6 @@ export default function Detail() {
     } catch {
       setBtError('数据拉取失败，请检查网络后重试')
       return false
-    }
-  }
-
-  const handleOptimizeAll = async () => {
-    if (!selectedETF) return
-    setBtError('')
-    setBacktesting(true)
-    const ok = await ensureData()
-    if (!ok) { setBacktesting(false); return }
-    try {
-      const opt = await workerOptimizeAll(selectedETF.code)
-      setBtBuy(opt.bestBuy)
-      setBtSell(opt.bestSell)
-      setBacktestResult(opt.result)
-      await saveWeights('etf', opt.bestWeights)
-      await saveSetting('buyThreshold', opt.bestBuy)
-      await saveSetting('sellThreshold', opt.bestSell)
-      setTimeout(() => {
-        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
-    } catch (err: any) {
-      setBtError(err?.message || '全优化失败，请重试')
-    } finally {
-      setBacktesting(false)
-    }
-  }
-
-  const handleLearn = async () => {
-    if (!selectedETF) return
-    setBtError('')
-    setBacktesting(true)
-    const ok = await ensureData()
-    if (!ok) { setBacktesting(false); return }
-    try {
-      await workerLearn(selectedETF.code)
-      setBtError('✅ 自学习完成，权重已更新。因子仪表盘可查看详情')
-    } catch (err: any) {
-      setBtError(err?.message || '自学习失败')
-    } finally {
-      setBacktesting(false)
     }
   }
 
@@ -284,7 +237,7 @@ export default function Detail() {
     const ok = await ensureData()
     if (!ok) { setBacktesting(false); return }
     try {
-      const result = await workerBacktest(selectedETF.code, btBuy, btSell)
+      const result = await workerBacktest(selectedETF.code)
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -316,20 +269,7 @@ export default function Detail() {
             <div className="signal-text">{signalLabel(latestSignal.signal)}</div>
             <div className="signal-date">{latestSignal.date}</div>
           </div>
-          <div className="signal-score-det">{latestSignal.compositeScore}</div>
-        </div>
-      )}
-
-      {latestSignal && (
-        <div className="factor-grid">
-          {latestSignal.factorScores.map(fs => (
-            <div key={fs.factorId} className="factor-item">
-              <div className="factor-name">{fs.name}</div>
-              <div className="factor-value" style={{
-                color: fs.score >= 70 ? 'var(--green)' : fs.score < 40 ? 'var(--red)' : 'var(--yellow)'
-              }}>{fs.score}</div>
-            </div>
-          ))}
+          <div className="signal-score-det">{latestSignal.score}</div>
         </div>
       )}
 
@@ -360,7 +300,7 @@ export default function Detail() {
           <div key={sig.id} className="history-item">
             <span>{sig.date}</span>
             <span>{signalEmoji(sig.signal)}</span>
-            <span style={{ color: signalColor(sig.signal) }}>{sig.compositeScore}</span>
+            <span style={{ color: signalColor(sig.signal) }}>{sig.score}</span>
           </div>
         ))}
         {signals.length === 0 && <div className="history-item"><span style={{color: 'var(--text-secondary)'}}>暂无信号记录</span></div>}
@@ -374,7 +314,7 @@ export default function Detail() {
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            买入≥{btBuy} 卖出&lt;{btSell}
+            MA20 上穿买入 · 破位/ATR止损(2.5)卖出
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">
@@ -444,20 +384,6 @@ export default function Detail() {
           disabled={backtesting}
         >
           {backtesting ? '⏳ 计算中...' : '📊 回测'}
-        </button>
-        <button
-          className="optimize-all-btn"
-          onClick={handleOptimizeAll}
-          disabled={backtesting}
-        >
-          🧬 寻优权重+阈值
-        </button>
-        <button
-          className="learn-btn"
-          onClick={handleLearn}
-          disabled={backtesting}
-        >
-          🧠 从历史学习
         </button>
       </div>
     </div>

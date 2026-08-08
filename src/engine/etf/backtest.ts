@@ -1,9 +1,8 @@
-import type { KLine, SignalThresholds } from '../../types'
-import { scoreETF } from './scorer'
-import { DEFAULT_SIGNAL_THRESHOLDS } from '../../config/defaults'
+import type { KLine } from '../../types'
 import { sma, atr } from '../common'
+import { MA_PERIOD, ATR_PERIOD } from './trendSignal'
 
-/** ATR 移动止损倍数：持仓最高价回撤超过 N×ATR 即触发离场（主退出，弥补指标滞后） */
+/** ATR 移动止损倍数：持仓最高价回撤超过 N×ATR 即离场 */
 export const ATR_STOP_MULT = 2.5
 
 export interface BacktestTrade {
@@ -29,19 +28,21 @@ export interface BacktestResult {
 }
 
 /**
- * Run backtest on historical K-line data
- * @param bars K-line data (must be sorted by date ascending)
- * @param weights Factor weights to use
- * @param thresholds Signal thresholds (default: buy>=80, sell<40)
- * @param initialCapital Starting capital (default: 100000)
+ * 纯趋势跟随回测：
+ * - 买入：收盘价上穿 MA20 且 MA20 向上 → 次日开盘满仓
+ * - 卖出：收盘价跌破 MA20（趋势破位）或跌破 ATR 移动止损 → 次日开盘清仓
+ * @param bars K线数据（按日期升序）
+ * @param maPeriod 均线周期（默认 20）
+ * @param stopMult ATR 止损倍数（默认 2.5）
+ * @param initialCapital 初始资金（默认 10万）
  */
 export function runBacktest(
   bars: KLine[],
-  weights: Record<string, number>,
-  thresholds: SignalThresholds = DEFAULT_SIGNAL_THRESHOLDS,
+  maPeriod: number = MA_PERIOD,
+  stopMult: number = ATR_STOP_MULT,
   initialCapital: number = 100000
 ): BacktestResult {
-  if (bars.length < 80) {
+  if (bars.length < maPeriod + 2) {
     return {
       totalReturn: 0, annualizedReturn: 0, maxDrawdown: 0,
       sharpeRatio: 0, winRate: 0, totalTrades: 0, winningTrades: 0,
@@ -57,48 +58,29 @@ export function runBacktest(
   let peakHigh = 0
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
-  const startIdx = 61
-  let prevScore = 50
+  const closes = bars.map(b => b.close)
 
-  if (bars.length > 60) {
-    const initResult = scoreETF(bars.slice(0, 60), weights, thresholds)
-    prevScore = initResult.compositeScore
-  }
+  for (let i = maPeriod; i < bars.length - 1; i++) {
+    const maNow = sma(closes.slice(0, i + 1), maPeriod)
+    const maPrev = sma(closes.slice(0, i), maPeriod)
+    const prevClose = closes[i - 1]
+    const close = closes[i]
 
+    // 穿越：昨收在 MA 一侧、今收在另一侧
+    const crossUp = prevClose <= maPrev && close > maNow
+    const crossDown = prevClose >= maPrev && close < maNow
+    const maRising = maNow > maPrev
 
-  const closePrices = bars.map(b => b.close)
-
-  for (let i = startIdx; i < bars.length - 1; i++) {
-    const windowBars = bars.slice(0, i + 1)
-    const result = scoreETF(windowBars, weights, thresholds)
-    const currentScore = result.compositeScore
-    const currentPrice = bars[i].close
-
-    // 趋势判断：MA5 斜率判断短期方向
-    const maNow = sma(closePrices.slice(0, i + 1), 5)
-    const maPrev = sma(closePrices.slice(0, i - 2), 5)
-    const priceTrendUp = maNow > maPrev
-    const priceTrendDown = maNow < maPrev
-
-    // 买入：分数穿越买入线 + 价格大趋势向上
-    const crossedBuy = prevScore < thresholds.buyThreshold && currentScore >= thresholds.buyThreshold
-    const validBuy = crossedBuy && priceTrendUp
-
-    // 卖出：分数穿越卖出线 + 价格大趋势向下
-    const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
-    const validSell = crossedSell && priceTrendDown
-
-    // ATR 移动止损：持仓最高价回撤超过 N×ATR → 离场（主退出，弥补指标滞后）
+    // ATR 移动止损：持仓最高价回撤超过 N×ATR → 离场
     let stopHit = false
     if (holding) {
       if (bars[i].high > peakHigh) peakHigh = bars[i].high
-      const a = atr(bars.slice(0, i + 1), 14)
-      if (a > 0 && bars[i].close < peakHigh - ATR_STOP_MULT * a) stopHit = true
+      const a = atr(bars.slice(0, i + 1), ATR_PERIOD)
+      if (a > 0 && close < peakHigh - stopMult * a) stopHit = true
     }
 
-    if (!holding && validBuy) {
+    if (!holding && crossUp && maRising) {
       const nextOpen = bars[i + 1].open
-      // 满仓买入
       shares = cash / nextOpen
       cash = 0
       holding = true
@@ -106,34 +88,22 @@ export function runBacktest(
       buyDate = bars[i + 1].date
       peakHigh = nextOpen
     }
-    else if (holding && (validSell || stopHit)) {
-      // Sell at next day's open
+    else if (holding && (crossDown || stopHit)) {
       const nextOpen = bars[i + 1].open
       cash = shares * nextOpen
       const tradeReturn = (nextOpen - buyPrice) / buyPrice
       const holdDays = Math.round(
         (new Date(bars[i + 1].date).getTime() - new Date(buyDate).getTime()) / 86400000
       )
-      trades.push({
-        buyDate, buyPrice,
-        sellDate: bars[i + 1].date,
-        sellPrice: nextOpen,
-        return: tradeReturn,
-        holdDays,
-      })
+      trades.push({ buyDate, buyPrice, sellDate: bars[i + 1].date, sellPrice: nextOpen, return: tradeReturn, holdDays })
       shares = 0
       holding = false
     }
 
-    // Track equity
-    const equity = cash + shares * currentPrice
-    equityCurve.push({ date: bars[i].date, value: equity })
-
-    // Roll forward score history and holding counter
-    prevScore = currentScore
+    equityCurve.push({ date: bars[i].date, value: cash + shares * close })
   }
 
-  // If still holding at end, close position
+  // 若仍持仓，按最后收盘价平仓
   if (holding && shares > 0) {
     const lastPrice = bars[bars.length - 1].close
     cash = shares * lastPrice
@@ -141,28 +111,17 @@ export function runBacktest(
     const holdDays = Math.round(
       (new Date(bars[bars.length - 1].date).getTime() - new Date(buyDate).getTime()) / 86400000
     )
-    trades.push({
-      buyDate, buyPrice,
-      sellDate: bars[bars.length - 1].date,
-      sellPrice: lastPrice,
-      return: tradeReturn,
-      holdDays,
-    })
+    trades.push({ buyDate, buyPrice, sellDate: bars[bars.length - 1].date, sellPrice: lastPrice, return: tradeReturn, holdDays })
     equityCurve.push({ date: bars[bars.length - 1].date, value: cash })
   }
 
-  // Calculate metrics
+  // 指标计算
   const finalValue = cash + shares * bars[bars.length - 1].close
   const totalReturn = (finalValue - initialCapital) / initialCapital
-
-  // Annualized return
-  const tradingDays = bars.length - startIdx
+  const tradingDays = bars.length - maPeriod
   const years = tradingDays / 252
-  const annualizedReturn = years > 0
-    ? Math.pow(1 + totalReturn, 1 / years) - 1
-    : 0
+  const annualizedReturn = years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : 0
 
-  // Max drawdown
   let maxDrawdown = 0
   let peakValue = initialCapital
   for (const point of equityCurve) {
@@ -171,28 +130,20 @@ export function runBacktest(
     if (drawdown < maxDrawdown) maxDrawdown = drawdown
   }
 
-  // Sharpe ratio (simplified: using daily returns)
   const dailyReturns: number[] = []
   for (let i = 1; i < equityCurve.length; i++) {
-    dailyReturns.push(
-      (equityCurve[i].value - equityCurve[i - 1].value) / equityCurve[i - 1].value
-    )
+    dailyReturns.push((equityCurve[i].value - equityCurve[i - 1].value) / equityCurve[i - 1].value)
   }
   const avgDailyReturn = dailyReturns.reduce((s, r) => s + r, 0) / (dailyReturns.length || 1)
   const stdDailyReturn = Math.sqrt(
     dailyReturns.reduce((s, r) => s + (r - avgDailyReturn) ** 2, 0) / (dailyReturns.length || 1)
   )
-  const sharpeRatio = stdDailyReturn > 0
-    ? (avgDailyReturn / stdDailyReturn) * Math.sqrt(252)
-    : 0
+  const sharpeRatio = stdDailyReturn > 0 ? (avgDailyReturn / stdDailyReturn) * Math.sqrt(252) : 0
 
-  // Win rate
   const winningTrades = trades.filter(t => (t.return ?? 0) > 0).length
   const winRate = trades.length > 0 ? winningTrades / trades.length : 0
-
-  // Buy & hold benchmark
-  const firstPrice = bars[startIdx].close
-  const lastPrice = bars[bars.length - 1].close
+  const firstPrice = closes[maPeriod]
+  const lastPrice = closes[bars.length - 1]
   const buyAndHoldReturn = (lastPrice - firstPrice) / firstPrice
 
   return {
@@ -207,130 +158,4 @@ export function runBacktest(
     trades,
     buyAndHoldReturn,
   }
-}
-
-interface OptimizeResult {
-  bestBuy: number
-  bestSell: number
-  bestResult: BacktestResult
-  tested: number  // how many combinations tried
-}
-
-/**
- * Auto-optimize buy/sell thresholds (internal fallback for optimizeAll)
- * Tests combinations of buy (50-90 step 5) × sell (20-50 step 5)
- * Picks the one with highest total return that still has ≥3 trades
- */
-function optimizeThresholds(
-  bars: KLine[],
-  weights: Record<string, number>
-): OptimizeResult {
-  let bestBuy = 70
-  let bestSell = 40
-  let bestResult: BacktestResult | null = null
-  let bestScore = -Infinity
-  let tested = 0
-
-  for (let buy = 40; buy <= 90; buy += 5) {
-    for (let sell = 15; sell <= 55; sell += 5) {
-      tested++
-      const result = runBacktest(bars, weights, { buyThreshold: buy, sellThreshold: sell })
-      // 评分：优先回报率，但要求至少3笔交易才有统计意义
-      if (result.totalTrades >= 3) {
-        // 综合评分：收益40% + 回撤控制40% + 夏普比率20%
-        // 收益尽可能大，回撤尽可能小
-        const score = result.totalReturn * 0.4 - Math.abs(result.maxDrawdown) * 0.4 + result.sharpeRatio * 0.2
-        if (score > bestScore) {
-          bestScore = score
-          bestBuy = buy
-          bestSell = sell
-          bestResult = result
-        }
-      }
-    }
-  }
-
-  if (!bestResult) {
-    // 如果没有任何组合达到3笔交易，选交易最多的
-    let maxTrades = 0
-    for (let buy = 50; buy <= 90; buy += 5) {
-      for (let sell = 20; sell <= 55; sell += 5) {
-        tested++
-        const result = runBacktest(bars, weights, { buyThreshold: buy, sellThreshold: sell })
-        if (result.totalTrades > maxTrades) {
-          maxTrades = result.totalTrades
-          bestBuy = buy
-          bestSell = sell
-          bestResult = result
-        }
-      }
-    }
-  }
-
-  return { bestBuy, bestSell, bestResult: bestResult!, tested }
-}
-
-/** 生成所有有效的权重组合（4因子，每因子10%-50%，步长10%，总和=100%） */
-function* weightCombinations(): Generator<Record<string, number>> {
-  const factors = ['trend', 'momentum', 'volatility', 'moneyFlow']
-  for (let w1 = 10; w1 <= 50; w1 += 15) {
-    for (let w2 = 10; w2 <= 50; w2 += 15) {
-      for (let w3 = 10; w3 <= 50; w3 += 15) {
-        const w4 = 100 - w1 - w2 - w3
-        if (w4 >= 10 && w4 <= 50) {
-          yield {
-            [factors[0]]: w1 / 100,
-            [factors[1]]: w2 / 100,
-            [factors[2]]: w3 / 100,
-            [factors[3]]: w4 / 100,
-          }
-        }
-      }
-    }
-  }
-}
-
-export interface OptimizeAllResult {
-  bestWeights: Record<string, number>
-  bestBuy: number
-  bestSell: number
-  bestResult: BacktestResult
-  tested: number
-}
-
-/** 同时优化因子权重 + 买卖阈值 */
-export function optimizeAll(bars: KLine[]): OptimizeAllResult {
-  let bestWeights: Record<string, number> = { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 }
-  let bestBuy = 70
-  let bestSell = 40
-  let bestResult: BacktestResult | null = null
-  let bestScore = -Infinity
-  let tested = 0
-
-  for (const w of weightCombinations()) {
-    for (let buy = 55; buy <= 85; buy += 10) {
-      for (let sell = 25; sell <= 45; sell += 10) {
-        tested++
-        const result = runBacktest(bars, w, { buyThreshold: buy, sellThreshold: sell })
-        if (result.totalTrades >= 3) {
-          const score = result.totalReturn * 0.4 - Math.abs(result.maxDrawdown) * 0.4 + result.sharpeRatio * 0.2
-          if (score > bestScore) {
-            bestScore = score
-            bestWeights = { ...w }
-            bestBuy = buy
-            bestSell = sell
-            bestResult = result
-          }
-        }
-      }
-    }
-  }
-
-  if (!bestResult) {
-    // fallback: 用默认权重优化阈值
-    const fallback = optimizeThresholds(bars, { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 })
-    return { bestWeights: { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 }, bestBuy: fallback.bestBuy, bestSell: fallback.bestSell, bestResult: fallback.bestResult, tested: fallback.tested }
-  }
-
-  return { bestWeights, bestBuy, bestSell, bestResult: bestResult!, tested }
 }

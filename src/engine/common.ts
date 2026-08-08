@@ -34,21 +34,6 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * 冲高回落形态惩罚：最新一根日K长上影且收在低位 → 返回 0~10 的扣分。
- * 上影线占比越大、收盘位置越低，扣分越多。
- */
-export function reversalCandlePenalty(bar: KLine): number {
-  const range = bar.high - bar.low
-  if (range <= 0) return 0
-  const upperWick = (bar.high - Math.max(bar.open, bar.close)) / range
-  const closePos = (bar.close - bar.low) / range
-  if (upperWick > 0.5 && closePos < 0.3) {
-    return clamp((upperWick - 0.5) * 20 + (0.3 - closePos) * 20, 0, 10)
-  }
-  return 0
-}
-
-/**
  * Average True Range (ATR): simple average of True Range over the last `period` bars.
  * True Range = max(high-low, |high-prevClose|, |low-prevClose|), capturing gaps.
  * Returns 0 if there is insufficient data.

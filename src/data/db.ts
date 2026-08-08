@@ -1,6 +1,6 @@
 // src/data/db.ts
 import { openDB, type IDBPDatabase } from 'idb'
-import type { ETFInfo, KLine, Signal, LearningLog } from '../types'
+import type { ETFInfo, KLine, Signal } from '../types'
 
 const DB_NAME = 'etf-quant-db'
 const DB_VERSION = 1
@@ -21,14 +21,6 @@ async function getDB(): Promise<IDBPDatabase> {
         const signalStore = db.createObjectStore('signals', { keyPath: 'id' })
         signalStore.createIndex('etfCode', 'etfCode')
         signalStore.createIndex('date', 'date')
-      }
-      if (!db.objectStoreNames.contains('learningLogs')) {
-        const logStore = db.createObjectStore('learningLogs', { keyPath: 'id' })
-        logStore.createIndex('engine', 'engine')
-        logStore.createIndex('date', 'date')
-      }
-      if (!db.objectStoreNames.contains('weights')) {
-        db.createObjectStore('weights', { keyPath: 'engine' })
       }
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'key' })
@@ -83,42 +75,6 @@ export async function getSignals(params: {
   return db.getAllFromIndex('signals', 'date')
 }
 
-export async function saveWeights(
-  engine: string,
-  weights: Record<string, number>
-): Promise<void> {
-  const db = await getDB()
-  await db.put('weights', { engine, weights, updatedAt: new Date().toISOString() })
-}
-
-export async function getWeights(
-  engine: string
-): Promise<Record<string, number> | null> {
-  const db = await getDB()
-  const record = await db.get('weights', engine)
-  return record?.weights ?? null
-}
-
-export async function saveLearningLog(log: LearningLog): Promise<void> {
-  const db = await getDB()
-  await db.put('learningLogs', log)
-}
-
-export async function getLearningLogs(
-  engine: string,
-  limit = 20
-): Promise<LearningLog[]> {
-  const db = await getDB()
-  const index = db.transaction('learningLogs').store.index('engine')
-  let cursor = await index.openCursor(engine, 'prev')
-  const results: LearningLog[] = []
-  while (cursor && results.length < limit) {
-    results.push(cursor.value)
-    cursor = await cursor.continue()
-  }
-  return results
-}
-
 export async function saveSetting(key: string, value: unknown): Promise<void> {
   const db = await getDB()
   await db.put('settings', { key, value })
@@ -132,21 +88,19 @@ export async function getSetting<T>(key: string): Promise<T | null> {
 
 export async function exportAllData(): Promise<Record<string, unknown>> {
   const db = await getDB()
-  const [etfList, signals, learningLogs, weights, settings] = await Promise.all([
+  const [etfList, signals, settings] = await Promise.all([
     db.getAll('etfList'),
     db.getAll('signals'),
-    db.getAll('learningLogs'),
-    db.getAll('weights'),
     db.getAll('settings'),
   ])
   const allKline = await db.getAll('klineData')
-  return { etfList, klineData: allKline, signals, learningLogs, weights, settings }
+  return { etfList, klineData: allKline, signals, settings }
 }
 
 export async function importAllData(data: Record<string, unknown[]>): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(
-    ['etfList', 'klineData', 'signals', 'learningLogs', 'weights', 'settings'],
+    ['etfList', 'klineData', 'signals', 'settings'],
     'readwrite'
   )
   for (const item of (data.etfList as ETFInfo[]) ?? []) {
@@ -157,12 +111,6 @@ export async function importAllData(data: Record<string, unknown[]>): Promise<vo
   }
   for (const item of (data.signals as Signal[]) ?? []) {
     await tx.objectStore('signals').put(item)
-  }
-  for (const item of (data.learningLogs as LearningLog[]) ?? []) {
-    await tx.objectStore('learningLogs').put(item)
-  }
-  for (const item of (data.weights as { engine: string; weights: Record<string, number>; updatedAt: string }[]) ?? []) {
-    await tx.objectStore('weights').put(item)
   }
   for (const item of (data.settings as { key: string; value: unknown }[]) ?? []) {
     await tx.objectStore('settings').put(item)

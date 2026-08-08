@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { ETFInfo, Signal } from '../types'
-import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
+import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { useETFWorker } from '../hooks/useWorker'
-import { getETFList, saveETFList, getSignals, getKLines, getWeights, getSetting } from '../data/db'
-import { scoreETF } from '../engine/etf/scorer'
+import { getETFList, saveETFList, getSignals, getKLines } from '../data/db'
+import { computeTrendSignal } from '../engine/etf/trendSignal'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Dashboard.css'
 
@@ -39,20 +39,16 @@ export default function Dashboard() {
 
   const handleCardClick = async (etf: ETFInfo) => {
     setModalETF(etf)
-    // 从K线数据实时计算近十日评分
+    // 从K线实时计算近十日趋势分
     const bars = await getKLines(etf.code)
-    if (bars.length < 70) {
+    if (bars.length < 20) {
       setRecentScores([])
       return
     }
-    const weights = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
-    const savedBuy = await getSetting<number>('buyThreshold')
-    const savedSell = await getSetting<number>('sellThreshold')
-    const thresholds = (savedBuy && savedSell) ? { buyThreshold: savedBuy, sellThreshold: savedSell } : undefined
     const points: ScorePoint[] = []
-    for (let i = bars.length - 1; i >= Math.max(60, bars.length - 10); i--) {
-      const result = scoreETF(bars.slice(0, i + 1), weights, thresholds)
-      points.push({ date: bars[i].date, score: result.compositeScore, signal: result.signal })
+    for (let i = bars.length - 1; i >= Math.max(19, bars.length - 10); i--) {
+      const t = computeTrendSignal(bars.slice(0, i + 1))
+      points.push({ date: bars[i].date, score: t.score, signal: t.signal })
     }
     setRecentScores(points)
   }
@@ -99,19 +95,19 @@ export default function Dashboard() {
               <div className="etf-score">
                 {sig ? (
                   <span style={{ color: signalColor(sig.signal), fontWeight: 700, fontSize: 22 }}>
-                    {sig.compositeScore}
+                    {sig.score}
                   </span>
                 ) : (
                   <span style={{ color: 'var(--text-secondary)' }}>--</span>
                 )}
-                <div className="score-label">{'综合评分'}</div>
+                <div className="score-label">{'趋势分'}</div>
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* 近十日分数弹窗 */}
+      {/* 近十日趋势分弹窗 */}
       {modalETF && (
         <div className="score-modal-overlay" onClick={() => setModalETF(null)}>
           <div className="score-modal" onClick={e => e.stopPropagation()}>
@@ -122,7 +118,7 @@ export default function Dashboard() {
             </div>
             <div className="score-list">
               {recentScores.length === 0 ? (
-                <p className="score-empty">K线数据不足（需≥70天），请先点刷新拉取数据</p>
+                <p className="score-empty">K线数据不足（需≥20天），请先点刷新拉取数据</p>
               ) : (
                 recentScores.map((s, i) => (
                   <div key={s.date} className="score-row">

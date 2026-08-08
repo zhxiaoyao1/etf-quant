@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from 'react'
-import type { ETFInfo, Signal, LearningLog } from '../types'
+import type { ETFInfo, Signal } from '../types'
 
 function createWorker(): Worker {
   return new Worker(
@@ -33,26 +33,8 @@ export function useETFWorker() {
     []
   )
 
-  const learn = useCallback(
-    (etfCode: string): Promise<LearningLog> => {
-      return new Promise((resolve, reject) => {
-        const worker = createWorker()
-        setLoading(true)
-        worker.onmessage = (e) => {
-          setLoading(false)
-          worker.terminate()
-          if (e.data.type === 'learnComplete') resolve(e.data.log)
-          else if (e.data.type === 'error') reject(new Error(e.data.message))
-        }
-        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'learn', etfCode })
-      })
-    },
-    []
-  )
-
   const backtest = useCallback(
-    (etfCode: string, buyThreshold: number, sellThreshold: number): Promise<any> => {
+    (etfCode: string): Promise<any> => {
       return new Promise((resolve, reject) => {
         const worker = createWorker()
         setLoading(true)
@@ -63,29 +45,11 @@ export function useETFWorker() {
           else if (e.data.type === 'error') reject(new Error(e.data.message))
         }
         worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'backtest', etfCode, buyThreshold, sellThreshold })
+        worker.postMessage({ type: 'backtest', etfCode })
       })
     },
     []
   )
 
-  const optimizeAll = useCallback(
-    (etfCode: string): Promise<{ bestWeights: Record<string, number>; bestBuy: number; bestSell: number; result: any }> => {
-      return new Promise((resolve, reject) => {
-        const worker = createWorker()
-        setLoading(true)
-        worker.onmessage = (e) => {
-          setLoading(false)
-          worker.terminate()
-          if (e.data.type === 'optimizeAllResult') resolve({ bestWeights: e.data.bestWeights, bestBuy: e.data.bestBuy, bestSell: e.data.bestSell, result: e.data.result })
-          else if (e.data.type === 'error') reject(new Error(e.data.message))
-        }
-        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'optimizeAll', etfCode })
-      })
-    },
-    []
-  )
-
-  return { refresh, learn, backtest, optimizeAll, loading }
+  return { refresh, backtest, loading }
 }
