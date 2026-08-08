@@ -3,7 +3,8 @@ import { processKLines } from './cleaner'
 
 function buildKLineUrl(code: string, market: 'SH' | 'SZ'): string {
   const secid = market === 'SH' ? `1.${code}` : `0.${code}`
-  return `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&end=20500101&lmt=800`
+  // fields2 顺序即返回列顺序：f51日期 f52开 f53收 f54高 f55低 f56量 f57成交额 f61换手率（实测确认）
+  return `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f61&klt=101&fqt=1&end=20500101&lmt=800`
 }
 
 function parseEastMoneyKLine(raw: unknown): KLine[] {
@@ -13,6 +14,8 @@ function parseEastMoneyKLine(raw: unknown): KLine[] {
   if (!data?.data?.klines) return []
   return data.data.klines.map((line: string) => {
     const parts = line.split(',')
+    const amount = parseFloat(parts[6])
+    const turnover = parseFloat(parts[7])
     return {
       date: parts[0],
       open: parseFloat(parts[1]),
@@ -20,6 +23,8 @@ function parseEastMoneyKLine(raw: unknown): KLine[] {
       high: parseFloat(parts[3]),
       low: parseFloat(parts[4]),
       volume: parseInt(parts[5], 10),
+      amount: Number.isFinite(amount) ? amount : undefined,
+      turnover: Number.isFinite(turnover) ? turnover : undefined,
     }
   })
 }

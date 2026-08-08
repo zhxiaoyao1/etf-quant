@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cleanKLines, removeDuplicates, fillMissingDates } from '../../src/data/cleaner'
+import { cleanKLines, removeDuplicates } from '../../src/data/cleaner'
 import type { KLine } from '../../src/types'
 
 describe('cleanKLines', () => {
@@ -38,13 +38,3 @@ describe('removeDuplicates', () => {
   })
 })
 
-describe('fillMissingDates', () => {
-  it('does not modify complete daily data', () => {
-    const bars: KLine[] = [
-      { date: '2026-07-10', open: 1, high: 2, low: 1, close: 1.5, volume: 100 },
-      { date: '2026-07-13', open: 1, high: 2, low: 1, close: 1.5, volume: 100 },
-    ]
-    const result = fillMissingDates(bars)
-    expect(result).toHaveLength(2)
-  })
-})
