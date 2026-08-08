@@ -1,9 +1,6 @@
 import type { KLine } from '../../types'
-import { sma, atr } from '../common'
-import { MA_PERIOD, ATR_PERIOD } from './trendSignal'
-
-/** ATR 移动止损倍数：持仓最高价回撤超过 N×ATR 即离场 */
-export const ATR_STOP_MULT = 2.5
+import { sma } from '../common'
+import { MA_PERIOD } from './trendSignal'
 
 export interface BacktestTrade {
   buyDate: string
@@ -28,21 +25,19 @@ export interface BacktestResult {
 }
 
 /**
- * 纯趋势跟随回测：
- * - 买入：收盘价上穿 MA20 且 MA20 向上 → 次日开盘满仓
- * - 卖出：收盘价跌破 MA20（趋势破位）或跌破 ATR 移动止损 → 次日开盘清仓
+ * 最简均线策略回测：
+ * - 买入：收盘价 > MA20 → 次日开盘满仓
+ * - 卖出：收盘价 < MA20 → 次日开盘清仓
  * @param bars K线数据（按日期升序）
  * @param maPeriod 均线周期（默认 20）
- * @param stopMult ATR 止损倍数（默认 2.5）
  * @param initialCapital 初始资金（默认 10万）
  */
 export function runBacktest(
   bars: KLine[],
   maPeriod: number = MA_PERIOD,
-  stopMult: number = ATR_STOP_MULT,
   initialCapital: number = 100000
 ): BacktestResult {
-  if (bars.length < maPeriod + 2) {
+  if (bars.length < maPeriod + 1) {
     return {
       totalReturn: 0, annualizedReturn: 0, maxDrawdown: 0,
       sharpeRatio: 0, winRate: 0, totalTrades: 0, winningTrades: 0,
@@ -55,40 +50,23 @@ export function runBacktest(
   let holding = false
   let buyPrice = 0
   let buyDate = ''
-  let peakHigh = 0
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
   const closes = bars.map(b => b.close)
 
   for (let i = maPeriod; i < bars.length - 1; i++) {
-    const maNow = sma(closes.slice(0, i + 1), maPeriod)
-    const maPrev = sma(closes.slice(0, i), maPeriod)
-    const prevClose = closes[i - 1]
-    const close = closes[i]
+    const ma = sma(closes.slice(0, i + 1), maPeriod)
+    const above = closes[i] > ma
 
-    // 穿越：昨收在 MA 一侧、今收在另一侧
-    const crossUp = prevClose <= maPrev && close > maNow
-    const crossDown = prevClose >= maPrev && close < maNow
-    const maRising = maNow > maPrev
-
-    // ATR 移动止损：持仓最高价回撤超过 N×ATR → 离场
-    let stopHit = false
-    if (holding) {
-      if (bars[i].high > peakHigh) peakHigh = bars[i].high
-      const a = atr(bars.slice(0, i + 1), ATR_PERIOD)
-      if (a > 0 && close < peakHigh - stopMult * a) stopHit = true
-    }
-
-    if (!holding && crossUp && maRising) {
+    if (!holding && above) {
       const nextOpen = bars[i + 1].open
       shares = cash / nextOpen
       cash = 0
       holding = true
       buyPrice = nextOpen
       buyDate = bars[i + 1].date
-      peakHigh = nextOpen
     }
-    else if (holding && (crossDown || stopHit)) {
+    else if (holding && !above) {
       const nextOpen = bars[i + 1].open
       cash = shares * nextOpen
       const tradeReturn = (nextOpen - buyPrice) / buyPrice
@@ -100,7 +78,7 @@ export function runBacktest(
       holding = false
     }
 
-    equityCurve.push({ date: bars[i].date, value: cash + shares * close })
+    equityCurve.push({ date: bars[i].date, value: cash + shares * closes[i] })
   }
 
   // 若仍持仓，按最后收盘价平仓

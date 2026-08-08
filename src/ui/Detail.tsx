@@ -314,7 +314,7 @@ export default function Detail() {
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            MA20 上穿买入 · 破位/ATR止损(2.5)卖出
+            收盘价 &gt; MA20 买入 · &lt; MA20 卖出
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">

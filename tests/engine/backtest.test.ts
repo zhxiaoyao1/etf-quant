@@ -16,16 +16,22 @@ function makeSeries(fn: (i: number) => number, n: number): KLine[] {
   return bars
 }
 
-describe('runBacktest（MA20 穿越 + ATR止损）', () => {
+describe('runBacktest（收盘价 vs MA20）', () => {
   it('returns empty result for insufficient data', () => {
     const bars = makeSeries(() => 10, 15)
     const result = runBacktest(bars)
     expect(result.totalTrades).toBe(0)
   })
 
-  it('buys on MA20 up-cross in a rally and holds', () => {
-    // 先横盘再拉升：价格上穿 MA20 且 MA20 向上 → 买入并持有
-    const bars = makeSeries(i => (i < 40 ? 10 : 10 + (i - 40) * 0.2), 120)
+  it('does not buy when price stays at/below MA20', () => {
+    const bars = makeSeries(() => 10, 60)
+    const result = runBacktest(bars)
+    expect(result.totalTrades).toBe(0)
+  })
+
+  it('buys when price rises above MA20', () => {
+    // 横盘后拉升：收盘价上穿 MA20 → 买入并持有
+    const bars = makeSeries(i => (i < 40 ? 10 : 10 + (i - 40) * 0.2), 100)
     const result = runBacktest(bars)
     expect(result.totalTrades).toBeGreaterThanOrEqual(1)
     expect(result.equityCurve.length).toBeGreaterThan(0)
@@ -33,15 +39,14 @@ describe('runBacktest（MA20 穿越 + ATR止损）', () => {
     expect(result.maxDrawdown).toBeLessThanOrEqual(0)
   })
 
-  it('exits via ATR trailing stop on sustained decline after a rally', () => {
-    // 拉升后阴跌到底约 10.75；ATR 止损应在接近峰值的高位离场，而非扛到最低点
+  it('sells when price falls below MA20 after a rally', () => {
+    // 拉升后回落跌破 MA20 → 卖出，形成完整交易
     const bars = makeSeries(i =>
-      i <= 70 ? 10 : (i <= 85 ? 10 + (i - 70) * 0.55 : 18.25 - (i - 85) * 0.3), 111)
+      i <= 70 ? 10 : (i <= 90 ? 10 + (i - 70) * 0.2 : 14 - (i - 90) * 0.2), 120)
     const result = runBacktest(bars)
-    expect(result.totalTrades).toBeGreaterThan(0)
+    expect(result.totalTrades).toBeGreaterThanOrEqual(1)
     const sellPrices = result.trades.filter(t => t.sellPrice != null).map(t => t.sellPrice!)
     expect(sellPrices.length).toBeGreaterThan(0)
-    expect(Math.min(...sellPrices)).toBeGreaterThan(12)
   })
 
   it('buyAndHoldReturn matches simple price change', () => {
