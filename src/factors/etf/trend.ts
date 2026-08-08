@@ -1,6 +1,6 @@
 import type { Factor, KLine } from '../../types'
 import { FACTOR_PARAMS } from '../../config/defaults'
-import { smaSeries } from '../../engine/common'
+import { smaSeries, atr, clamp, reversalCandlePenalty } from '../../engine/common'
 
 function ema(bars: KLine[], period: number): number[] {
   const result: number[] = []
@@ -45,7 +45,7 @@ function macd(
 export const trendFactor: Factor = {
   id: 'trend',
   name: '趋势',
-  description: '基于均线多头/空头排列和MACD判断趋势方向',
+  description: '基于均线排列、MA20斜率和MACD连续评分判断趋势强弱（越强越高分）',
   params: FACTOR_PARAMS.trend,
 
   calculate(bars: KLine[]): number {
@@ -55,42 +55,38 @@ export const trendFactor: Factor = {
     const ma5 = smaSeries(closePrices, p.maFast as number)
     const ma20 = smaSeries(closePrices, p.maMid as number)
     const ma60 = smaSeries(closePrices, p.maSlow as number)
+    const a = atr(bars, 14)
+    if (a <= 0) return 50
 
-    const latest5 = ma5[ma5.length - 1]
-    const latest20 = ma20[ma20.length - 1]
-    const latest60 = ma60[ma60.length - 1]
+    const last5 = ma5[ma5.length - 1]
+    const last20 = ma20[ma20.length - 1]
+    const last60 = ma60[ma60.length - 1]
+    const last = bars[bars.length - 1]
+    const close = last.close
 
-    let alignmentScore = 0
-    if (latest5 > latest20 && latest20 > latest60) {
-      alignmentScore = 60
-    } else if (latest5 < latest20 && latest20 < latest60) {
-      alignmentScore = 0
-    } else if (latest5 > latest60) {
-      alignmentScore = 40
-    } else {
-      alignmentScore = 20
-    }
+    // 1) 排列度（0~40）：MA5-MA20 与 MA20-MA60 价差（ATR 单位），tanh 平滑连续
+    const s1 = (last5 - last20) / a
+    const s2 = (last20 - last60) / a
+    const alignment = clamp(20 + 20 * Math.tanh((s1 + s2) / 2), 0, 40)
 
-    const { histogram } = macd(
-      bars,
-      p.macdFast as number,
-      p.macdSlow as number,
-      p.macdSignal as number
-    )
-    const latestHist = histogram[histogram.length - 1]
-    const prevHist = histogram[histogram.length - 2] ?? 0
+    // 2) MA20 斜率（0~30）：MA20 对比 5 日前（ATR 单位）
+    const slopeRef = ma20.length > 6 ? ma20[ma20.length - 6] : ma20[0]
+    const slope = (last20 - slopeRef) / a
+    const slopeScore = clamp(15 + 15 * Math.tanh(slope / 1.0), 0, 30)
 
-    let macdScore = 20
-    if (latestHist > 0 && latestHist > prevHist) {
-      macdScore = 40
-    } else if (latestHist > 0 && latestHist < prevHist) {
-      macdScore = 30
-    } else if (latestHist < 0 && latestHist > prevHist) {
-      macdScore = 15
-    } else if (latestHist < 0 && latestHist < prevHist) {
-      macdScore = 0
-    }
+    // 3) MACD 状态（0~30）：柱状图大小（ATR 归一）
+    const { histogram } = macd(bars, p.macdFast as number, p.macdSlow as number, p.macdSignal as number)
+    const hist = histogram[histogram.length - 1]
+    const macdScore = clamp(15 + 15 * Math.tanh(hist / (0.5 * a)), 0, 30)
 
-    return Math.round(alignmentScore + macdScore)
+    // 4) 冲高回落闸门：近3日暴涨（ATR 单位）→ 扣分，防止追在尖顶
+    const close3 = bars[bars.length - 4].close
+    const surge = (close - close3) / a
+    const surgePenalty = surge > 3 ? clamp((surge - 3) * 10, 0, 20) : 0
+
+    // 5) 形态惩罚：长上影 + 收在低位
+    const candlePenalty = reversalCandlePenalty(last)
+
+    return Math.round(clamp(alignment + slopeScore + macdScore - surgePenalty - candlePenalty, 0, 100))
   },
 }

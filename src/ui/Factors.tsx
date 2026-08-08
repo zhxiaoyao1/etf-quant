@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react'
 import type { LearningLog } from '../types'
-import { getWeights, getLearningLogs, getSetting, saveSetting, saveWeights } from '../data/db'
+import { getWeights, getLearningLogs, getSetting, saveSetting, saveWeights, getETFList, getKLines } from '../data/db'
 import { DEFAULT_ETF_WEIGHTS, DEFAULT_SIGNAL_THRESHOLDS } from '../config/defaults'
+import { runDiagnostics, type FactorICResult } from '../engine/etf/diagnostics'
+import { etfFactors } from '../factors/etf'
 import './Factors.css'
+
+function icColor(v: number): string {
+  if (v > 0.1) return 'var(--green)'
+  if (v < -0.05) return 'var(--red)'
+  return 'var(--text-secondary)'
+}
 
 export default function Factors() {
   const [weights, setWeights] = useState<Record<string, number>>(DEFAULT_ETF_WEIGHTS)
@@ -10,6 +18,8 @@ export default function Factors() {
   const [buyThreshold, setBuyThreshold] = useState(DEFAULT_SIGNAL_THRESHOLDS.buyThreshold)
   const [sellThreshold, setSellThreshold] = useState(DEFAULT_SIGNAL_THRESHOLDS.sellThreshold)
   const [saved, setSaved] = useState(false)
+  const [diagnosing, setDiagnosing] = useState(false)
+  const [diagResults, setDiagResults] = useState<{ code: string; name: string; compositeIC: number; factors: FactorICResult[] }[]>([])
 
   useEffect(() => {
     getWeights('etf').then(w => { if (w) setWeights(w) })
@@ -26,6 +36,28 @@ export default function Factors() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  // 因子有效性诊断：对每只自选ETF计算各因子IC（分数与未来5日收益的相关性）
+  const handleDiagnose = async () => {
+    setDiagnosing(true)
+    try {
+      const list = await getETFList()
+      const w = await getWeights('etf') ?? DEFAULT_ETF_WEIGHTS
+      const results: { code: string; name: string; compositeIC: number; factors: FactorICResult[] }[] = []
+      for (const etf of list) {
+        const bars = await getKLines(etf.code)
+        if (bars.length < 70) continue
+        const res = runDiagnostics(bars, etfFactors, w, 5)
+        if (res.factors.length === 0) continue
+        results.push({ code: etf.code, name: etf.name, compositeIC: res.compositeIC, factors: res.factors })
+      }
+      setDiagResults(results)
+    } catch {
+      setDiagResults([])
+    } finally {
+      setDiagnosing(false)
+    }
+  }
+
   const updateWeight = (id: string, value: number) => {
     setWeights(prev => ({ ...prev, [id]: value / 100 }))
   }
@@ -38,6 +70,21 @@ export default function Factors() {
   for (const [id, w] of Object.entries(weights)) {
     factorPct[id] = Math.round(w * 100)
   }
+
+  // 诊断结果汇总：各因子跨ETF的平均IC/命中率/样本
+  const factorSummaries = ['trend', 'momentum', 'volatility', 'moneyFlow'].map(fid => {
+    const list = diagResults.flatMap(r => r.factors.filter(f => f.factorId === fid))
+    return {
+      fid,
+      name: factorNames[fid] ?? fid,
+      avgIC: list.length > 0 ? list.reduce((s, f) => s + f.ic, 0) / list.length : 0,
+      avgHit: list.length > 0 ? list.reduce((s, f) => s + f.hitRate, 0) / list.length : 0,
+      samples: list.reduce((s, f) => s + f.sampleCount, 0),
+    }
+  })
+  const avgCompositeIC = diagResults.length > 0
+    ? diagResults.reduce((s, r) => s + r.compositeIC, 0) / diagResults.length
+    : 0
 
   return (
     <div className="factors">
@@ -99,6 +146,55 @@ export default function Factors() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* 因子有效性诊断 */}
+      <section className="factors-section">
+        <h3>因子有效性诊断</h3>
+        <button className="factor-save-btn" onClick={handleDiagnose} disabled={diagnosing}>
+          {diagnosing ? '诊断中...' : '📊 运行诊断（全部ETF）'}
+        </button>
+        <p className="diag-note">
+          IC = 因子分数与未来5日收益的相关系数。IC &gt; 0.1 有效、≈0 无预测力、负值反向有害。
+        </p>
+        {diagnosing && <p className="empty-log">正在计算，请稍候...</p>}
+        {!diagnosing && diagResults.length === 0 && (
+          <p className="empty-log">点"运行诊断"查看各因子在自选ETF上的有效性（需先刷新数据，每只≥70天）</p>
+        )}
+        {diagResults.length > 0 && (
+          <>
+            <table className="diag-table">
+              <thead>
+                <tr>
+                  <th>因子</th><th>平均IC</th><th>命中率</th><th>样本</th>
+                </tr>
+              </thead>
+              <tbody>
+                {factorSummaries.map(s => (
+                  <tr key={s.fid}>
+                    <td>{s.name}</td>
+                    <td style={{ color: icColor(s.avgIC), fontWeight: 700 }}>{s.avgIC.toFixed(3)}</td>
+                    <td>{(s.avgHit * 100).toFixed(1)}%</td>
+                    <td>{s.samples}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ fontWeight: 700 }}>综合分</td>
+                  <td style={{ color: icColor(avgCompositeIC), fontWeight: 700 }}>{avgCompositeIC.toFixed(3)}</td>
+                  <td colSpan={2} style={{ color: 'var(--text-secondary)' }}>对 {diagResults.length} 只ETF取平均</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="diag-per-etf">
+              {diagResults.map(r => (
+                <div key={r.code} className="diag-etf-row">
+                  <span>{r.name}（{r.code}）</span>
+                  <span style={{ color: icColor(r.compositeIC) }}>综合IC {r.compositeIC.toFixed(3)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </section>
     </div>
   )

@@ -32,7 +32,6 @@ export const FACTOR_PARAMS = {
   momentum: {
     rsiPeriod: 14,
     kdjPeriod: 9,
-    kdjSignal: 3,
   },
   volatility: {
     bbPeriod: 20,

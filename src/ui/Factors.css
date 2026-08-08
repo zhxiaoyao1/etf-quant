@@ -35,3 +35,11 @@
   cursor: pointer;
   margin-bottom: 12px;
 }
+.diag-note { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+.diag-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 10px; }
+.diag-table th, .diag-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; }
+.diag-table th { font-weight: 600; color: var(--text-secondary); }
+.diag-table td:first-child, .diag-table th:first-child { text-align: left; }
+.diag-per-etf { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.diag-etf-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.diag-etf-row:last-child { border-bottom: none; }

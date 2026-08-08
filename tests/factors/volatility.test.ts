@@ -7,7 +7,18 @@ function makeBar(date: string, close: number): KLine {
 }
 
 describe('volatilityFactor', () => {
-  it('returns high score when price near lower Bollinger band', () => {
+  it('returns high score when price above middle Bollinger band', () => {
+    const bars: KLine[] = []
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(2026, 0, 1)
+      d.setDate(d.getDate() + i)
+      bars.push(makeBar(d.toISOString().slice(0, 10), 20 + i * 0.3))
+    }
+    const score = volatilityFactor.calculate(bars)
+    expect(score).toBeGreaterThanOrEqual(40)
+  })
+
+  it('returns low score when price below middle Bollinger band', () => {
     const bars: KLine[] = []
     for (let i = 0; i < 30; i++) {
       const d = new Date(2026, 0, 1)
@@ -15,7 +26,7 @@ describe('volatilityFactor', () => {
       bars.push(makeBar(d.toISOString().slice(0, 10), 20 - i * 0.3))
     }
     const score = volatilityFactor.calculate(bars)
-    expect(score).toBeGreaterThanOrEqual(50)
+    expect(score).toBeLessThanOrEqual(40)
   })
 
   it('returns score in 0-100 range', () => {

@@ -45,4 +45,20 @@ describe('runBacktest', () => {
     // Buy & hold should be positive since price trends up
     expect(result.buyAndHoldReturn).toBeGreaterThan(0)
   })
+
+  it('exits via ATR trailing stop on sustained decline after a rally', () => {
+    // 拉升后阴跌到底约 10.75；ATR 移动止损应在接近峰值的高位离场，而非扛到最低点
+    const bars: KLine[] = []
+    for (let i = 0; i < 111; i++) {
+      const d = new Date(2020, 0, 1)
+      d.setDate(d.getDate() + i)
+      const price = i <= 70 ? 10 : (i <= 85 ? 10 + (i - 70) * 0.55 : 18.25 - (i - 85) * 0.3)
+      bars.push({ date: d.toISOString().slice(0, 10), open: price, high: price * 1.01, low: price * 0.99, close: price, volume: 1000 })
+    }
+    const result = runBacktest(bars, { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 })
+    expect(result.totalTrades).toBeGreaterThan(0)
+    const sellPrices = result.trades.filter(t => t.sellPrice != null).map(t => t.sellPrice!)
+    expect(sellPrices.length).toBeGreaterThan(0)
+    expect(Math.min(...sellPrices)).toBeGreaterThan(12)
+  })
 })

@@ -1,5 +1,6 @@
 import type { Factor, KLine } from '../../types'
 import { FACTOR_PARAMS } from '../../config/defaults'
+import { atr, clamp } from '../../engine/common'
 
 function bollingerBands(bars: KLine[], period: number, stdDev: number) {
   if (bars.length < period) return { upper: 0, middle: 0, lower: 0, width: 0 }
@@ -16,54 +17,28 @@ function bollingerBands(bars: KLine[], period: number, stdDev: number) {
   }
 }
 
-function atr(bars: KLine[], period: number): number {
-  if (bars.length < period + 1) return 0
-  const slice = bars.slice(-period)
-  let sum = 0
-  for (let i = 1; i < slice.length; i++) {
-    const high = slice[i].high
-    const low = slice[i].low
-    const prevClose = slice[i - 1].close
-    const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose))
-    sum += tr
-  }
-  return sum / period
-}
-
 export const volatilityFactor: Factor = {
   id: 'volatility',
   name: '波动率',
-  description: '基于布林带位置和ATR判断价格位置安全度',
+  description: '基于布林中轨位置判断价格强弱区间（中轨上方=强势），并用ATR惩罚高波动',
   params: FACTOR_PARAMS.volatility,
 
   calculate(bars: KLine[]): number {
     if (bars.length < 25) return 50
-    const { upper, lower } = bollingerBands(bars, this.params.bbPeriod as number, this.params.bbStdDev as number)
+    const { upper, middle, lower } = bollingerBands(bars, this.params.bbPeriod as number, this.params.bbStdDev as number)
     const currentPrice = bars[bars.length - 1].close
-    const atrValue = atr(bars, this.params.atrPeriod as number)
-    const atrRatio = atrValue / currentPrice
+    const a = atr(bars, this.params.atrPeriod as number)
+    if (currentPrice <= 0) return 50
 
-    const position = (currentPrice - lower) / (upper - lower || 0.001)
-    let bbScore = 0
-    if (position <= 0.2) {
-      bbScore = 70
-    } else if (position <= 0.4) {
-      bbScore = 55
-    } else if (position <= 0.6) {
-      bbScore = 35
-    } else if (position <= 0.8) {
-      bbScore = 15
-    } else {
-      bbScore = 0
-    }
+    // 1) 布林中轨位置（0~70）：中轨上方=强势，贴近上轨最高，跌破中轨走低
+    const bandWidth = upper - lower
+    const position = bandWidth > 0 ? (currentPrice - middle) / bandWidth : 0
+    const positionScore = clamp(35 + 70 * position, 0, 70)
 
-    let atrPenalty = 0
-    if (atrRatio > 0.05) {
-      atrPenalty = 30
-    } else if (atrRatio > 0.03) {
-      atrPenalty = 15
-    }
+    // 2) ATR 混乱惩罚（0~30）：波动率过高 = 行情混乱 → 扣分
+    const atrPct = a / currentPrice
+    const atrPenalty = clamp(((atrPct - 0.03) / 0.02) * 30, 0, 30)
 
-    return Math.round(Math.max(0, bbScore - atrPenalty))
+    return Math.round(clamp(positionScore - atrPenalty, 0, 100))
   },
 }

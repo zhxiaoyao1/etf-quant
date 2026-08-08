@@ -1,7 +1,10 @@
 import type { KLine, SignalThresholds } from '../../types'
 import { scoreETF } from './scorer'
 import { DEFAULT_SIGNAL_THRESHOLDS } from '../../config/defaults'
-import { sma } from '../common'
+import { sma, atr } from '../common'
+
+/** ATR 移动止损倍数：持仓最高价回撤超过 N×ATR 即触发离场（主退出，弥补指标滞后） */
+export const ATR_STOP_MULT = 2.5
 
 export interface BacktestTrade {
   buyDate: string
@@ -23,7 +26,6 @@ export interface BacktestResult {
   equityCurve: { date: string; value: number }[]
   trades: BacktestTrade[]
   buyAndHoldReturn: number  // benchmark
-  finalWeights?: Record<string, number>
 }
 
 /**
@@ -33,25 +35,17 @@ export interface BacktestResult {
  * @param thresholds Signal thresholds (default: buy>=80, sell<40)
  * @param initialCapital Starting capital (default: 100000)
  */
-export interface BacktestOptions {
-  useLearning?: boolean     // 每21天自动学习调整权重
-  positionSizing?: boolean  // 根据信号强度动态仓位（非满仓进出）
-  benchmarkBars?: KLine[]   // 大盘K线（如沪深300），用于宏观择时过滤
-}
-
 export function runBacktest(
   bars: KLine[],
   weights: Record<string, number>,
   thresholds: SignalThresholds = DEFAULT_SIGNAL_THRESHOLDS,
-  initialCapital: number = 100000,
-  options: BacktestOptions = {}
+  initialCapital: number = 100000
 ): BacktestResult {
-  const { useLearning = false, positionSizing = false, benchmarkBars } = options
   if (bars.length < 80) {
     return {
       totalReturn: 0, annualizedReturn: 0, maxDrawdown: 0,
       sharpeRatio: 0, winRate: 0, totalTrades: 0, winningTrades: 0,
-      equityCurve: [], trades: [], buyAndHoldReturn: 0, finalWeights: undefined,
+      equityCurve: [], trades: [], buyAndHoldReturn: 0,
     }
   }
 
@@ -60,6 +54,7 @@ export function runBacktest(
   let holding = false
   let buyPrice = 0
   let buyDate = ''
+  let peakHigh = 0
   const trades: BacktestTrade[] = []
   const equityCurve: { date: string; value: number }[] = []
   const startIdx = 61
@@ -74,32 +69,6 @@ export function runBacktest(
   const closePrices = bars.map(b => b.close)
 
   for (let i = startIdx; i < bars.length - 1; i++) {
-    // 自学习：每21个交易日根据近期信心加权准确率调整权重
-    if (useLearning && i > startIdx + 21 && (i - startIdx) % 21 === 0) {
-      const factorIds = Object.keys(weights)
-      const wScore: Record<string, number> = {}
-      const wConf: Record<string, number> = {}
-      for (const id of factorIds) { wScore[id] = 0; wConf[id] = 0 }
-      for (let j = Math.max(startIdx, i - 21); j <= Math.min(i, bars.length - 6); j++) {
-        const r = scoreETF(bars.slice(0, j + 1), weights, thresholds)
-        const actualUp = bars[j + 5].close > bars[j].close
-        for (const fs of r.factorScores) {
-          const confidence = Math.abs(fs.score - 50) / 50
-          wConf[fs.factorId] = (wConf[fs.factorId] ?? 0) + confidence
-          wScore[fs.factorId] = (wScore[fs.factorId] ?? 0) + ((fs.score > 50) === actualUp ? confidence : -confidence)
-        }
-      }
-      const acc: Record<string, number> = {}
-      for (const id of factorIds) {
-        acc[id] = (wConf[id] ?? 0) > 0 ? Math.max(0.05, ((wScore[id] ?? 0) / wConf[id] + 1) / 2) : 0.25
-      }
-      const sum = Object.values(acc).reduce((s, v) => s + v, 0) || 1
-      for (const id of factorIds) {
-        const raw = acc[id] / sum
-        weights[id] = Math.max(0.1, Math.min(0.5, weights[id] * 0.5 + raw * 0.5))
-      }
-    }
-
     const windowBars = bars.slice(0, i + 1)
     const result = scoreETF(windowBars, weights, thresholds)
     const currentScore = result.compositeScore
@@ -119,34 +88,25 @@ export function runBacktest(
     const crossedSell = prevScore > thresholds.sellThreshold && currentScore <= thresholds.sellThreshold
     const validSell = crossedSell && priceTrendDown
 
-    // 大盘择时：检查基准ETF的MA5趋势
-    let marketOk = true
-    if (benchmarkBars && benchmarkBars.length > i) {
-      const bmLast5 = benchmarkBars.slice(Math.max(0, i - 4), i + 1)
-      const bmPrev5 = benchmarkBars.slice(Math.max(0, i - 8), Math.max(0, i - 3))
-      if (bmLast5.length >= 5 && bmPrev5.length >= 5) {
-        const bmMaNow = bmLast5.reduce((s, b) => s + b.close, 0) / 5
-        const bmMaPrev = bmPrev5.reduce((s, b) => s + b.close, 0) / 5
-        marketOk = bmMaNow > bmMaPrev  // 大盘MA5向上才是好环境
-      }
+    // ATR 移动止损：持仓最高价回撤超过 N×ATR → 离场（主退出，弥补指标滞后）
+    let stopHit = false
+    if (holding) {
+      if (bars[i].high > peakHigh) peakHigh = bars[i].high
+      const a = atr(bars.slice(0, i + 1), 14)
+      if (a > 0 && bars[i].close < peakHigh - ATR_STOP_MULT * a) stopHit = true
     }
 
     if (!holding && validBuy) {
       const nextOpen = bars[i + 1].open
-      // 仓位：分数越高仓位越重，最低30%，最高100%
-      let pct = positionSizing
-        ? Math.min(1.0, Math.max(0.3, (currentScore - thresholds.buyThreshold) / (100 - thresholds.buyThreshold) * 0.7 + 0.3))
-        : 1.0
-      // 大盘下跌时仓位减半
-      if (benchmarkBars && !marketOk) pct *= 0.5
-      const investAmount = cash * pct
-      shares = investAmount / nextOpen
-      cash -= investAmount
+      // 满仓买入
+      shares = cash / nextOpen
+      cash = 0
       holding = true
       buyPrice = nextOpen
       buyDate = bars[i + 1].date
+      peakHigh = nextOpen
     }
-    else if (holding && validSell) {
+    else if (holding && (validSell || stopHit)) {
       // Sell at next day's open
       const nextOpen = bars[i + 1].open
       cash = shares * nextOpen
@@ -246,11 +206,10 @@ export function runBacktest(
     equityCurve,
     trades,
     buyAndHoldReturn,
-    finalWeights: useLearning ? { ...weights } : undefined,
   }
 }
 
-export interface OptimizeResult {
+interface OptimizeResult {
   bestBuy: number
   bestSell: number
   bestResult: BacktestResult
@@ -258,11 +217,11 @@ export interface OptimizeResult {
 }
 
 /**
- * Auto-optimize buy/sell thresholds
+ * Auto-optimize buy/sell thresholds (internal fallback for optimizeAll)
  * Tests combinations of buy (50-90 step 5) × sell (20-50 step 5)
  * Picks the one with highest total return that still has ≥3 trades
  */
-export function optimizeThresholds(
+function optimizeThresholds(
   bars: KLine[],
   weights: Record<string, number>
 ): OptimizeResult {

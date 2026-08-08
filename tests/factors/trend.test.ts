@@ -29,6 +29,23 @@ describe('trendFactor', () => {
     expect(score).toBeLessThanOrEqual(30)
   })
 
+  it('penalizes a sudden spike (冲高回落闸门)', () => {
+    const bars: KLine[] = []
+    for (let i = 0; i < 90; i++) {
+      const d = new Date(2026, 0, 1)
+      d.setDate(d.getDate() + i)
+      bars.push(makeBar(d.toISOString().slice(0, 10), 5 + i * 0.05))
+    }
+    const base = bars[bars.length - 1].close
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(2026, 0, 1)
+      d.setDate(d.getDate() + 90 + i)
+      bars.push(makeBar(d.toISOString().slice(0, 10), base * (1.05 + i * 0.05)))
+    }
+    const score = trendFactor.calculate(bars)
+    expect(score).toBeLessThanOrEqual(85)
+  })
+
   it('returns score in 0-100 range', () => {
     const bars: KLine[] = []
     for (let i = 0; i < 60; i++) {
