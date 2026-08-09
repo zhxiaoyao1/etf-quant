@@ -241,6 +241,7 @@ export default function Detail() {
     return () => {
       resizeObserver.disconnect()
       chart.remove()
+      if (bandChartRef.current === chart) bandChartRef.current = null
     }
   }, [bars])
 
