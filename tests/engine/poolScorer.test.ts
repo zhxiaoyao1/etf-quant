@@ -28,9 +28,9 @@ describe('scorePool（池级4因子打分）', () => {
     const b = scores.find(s => s.code === 'B')!
     expect(a.total).toBe(100)
     expect(a.signal).toBe('buy')
-    expect(b.total).toBe(20)
+    expect(b.total).toBe(35)      // 趋势0+动量0+波动率35+资金流0
     expect(b.signal).toBe('sell')
-    expect(a.momentum).toBe(25)   // 池内第一
+    expect(a.momentum).toBe(30)   // 池内第一（新权重）
     expect(b.momentum).toBe(0)    // 池内垫底
   })
 
@@ -40,7 +40,7 @@ describe('scorePool（池级4因子打分）', () => {
     const map = new Map([['A', bars], ['B', makeSeries(() => 10, 70, 1000)]])
     const scores = scorePool(map)
     const a = scores.find(s => s.code === 'A')!
-    expect(a.trend).toBe(40)
+    expect(a.trend).toBe(15)
   })
 
   it('波动率因子：高波动给低分（风险扣分项）', () => {
@@ -51,7 +51,7 @@ describe('scorePool（池级4因子打分）', () => {
     const scores = scorePool(map)
     const low = scores.find(s => s.code === 'LOW')!
     const high = scores.find(s => s.code === 'HIGH')!
-    expect(low.volatility).toBe(20)
+    expect(low.volatility).toBe(35)
     expect(high.volatility).toBe(0)
   })
 
@@ -63,7 +63,7 @@ describe('scorePool（池级4因子打分）', () => {
     const scores = scorePool(map)
     const inS = scores.find(s => s.code === 'IN')!
     const outS = scores.find(s => s.code === 'OUT')!
-    expect(inS.moneyFlow).toBe(15)
+    expect(inS.moneyFlow).toBe(20)
     expect(outS.moneyFlow).toBe(0)
   })
 })

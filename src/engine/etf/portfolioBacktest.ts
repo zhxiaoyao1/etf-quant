@@ -1,5 +1,5 @@
 import type { KLine } from '../../types'
-import { calcTrend, calcVolatility, calcMoneyFlow, roc20 } from './poolScorer'
+import { calcTrend, calcVolatility, calcMoneyFlow, roc20, POOL_WEIGHTS } from './poolScorer'
 
 export interface PortfolioBacktestResult {
   totalReturn: number
@@ -19,13 +19,15 @@ function cap(score: number): number {
 
 const BUY = 65
 const SELL = 45
+/** 月频调仓：每 N 个交易日重新打分调整（对齐60日信号周期，降低摩擦） */
+const REBALANCE_INTERVAL = 20
 
 /**
  * 组合级回测：对整个池子按分数规则做组合管理。
  * - 分数 ≥65：买入/持有（按分数上限仓位，75-100→80%，65-74→50%）
  * - 45~64：持有现有、不开新仓
  * - <45：清仓
- * 以每日收盘价执行再平衡（简化）。
+ * 月频调仓（每20个交易日），以调仓日收盘价执行（简化）。
  */
 export function runPortfolioBacktest(
   barsByCode: Map<string, KLine[]>,
@@ -44,6 +46,16 @@ export function runPortfolioBacktest(
   let tradeCount = 0
 
   for (let t = start; t < maxLen; t++) {
+    // 每日估值（非调仓日也更新权益曲线）
+    let equity = cash
+    for (const code of codes) {
+      equity += (shares[code] ?? 0) * barsByCode.get(code)![t].close
+    }
+    equityCurve.push({ date: barsByCode.get(codes[0])![t].date, value: equity })
+
+    // 月频调仓：每 REBALANCE_INTERVAL 个交易日才重新打分调整
+    if ((t - start) % REBALANCE_INTERVAL !== 0) continue
+
     // 池内打分（含动量排名）
     const perCode: Record<string, { trend: number; vol: number; flow: number; roc: number }> = {}
     for (const code of codes) {
@@ -56,28 +68,21 @@ export function runPortfolioBacktest(
     for (let i = 0; i < n; i++) {
       const code = ranked[i]
       const rank = n > 1 ? i / (n - 1) : 0.5
-      const momentum = rank < 0.2 ? 25 : rank >= 0.8 ? 0 : 12
+      const momentum = rank < 0.2 ? POOL_WEIGHTS.momentum.top : rank >= 0.8 ? 0 : POOL_WEIGHTS.momentum.mid
       totals[code] = perCode[code].trend + momentum + perCode[code].vol + perCode[code].flow
     }
-
-    // 当前组合市值
-    let equity = cash
-    for (const code of codes) {
-      equity += (shares[code] ?? 0) * barsByCode.get(code)![t].close
-    }
-    equityCurve.push({ date: barsByCode.get(codes[0])![t].date, value: equity })
 
     // 目标权重：<45清仓，45-64持有现有不开新仓，≥65按分数仓位
     const targets: Record<string, number> = {}
     for (const code of codes) {
-      const t = totals[code]
-      if (t < SELL) {
+      const sc = totals[code]
+      if (sc < SELL) {
         targets[code] = 0
-      } else if (t < BUY) {
+      } else if (sc < BUY) {
         const price = barsByCode.get(code)![t].close
         targets[code] = (shares[code] ?? 0) > 0 && equity > 0 ? (shares[code]! * price) / equity : 0
       } else {
-        targets[code] = cap(t)
+        targets[code] = cap(sc)
       }
     }
     // 总仓位不超过100%：超了按比例缩放，防止隐性加杠杆导致复利爆炸
