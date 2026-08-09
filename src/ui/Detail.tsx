@@ -52,9 +52,9 @@ function calcBandWidth(bars: KLine[], period = 20, stdDev = 2): { time: string; 
   return width
 }
 
-export default function Detail() {
+export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) {
   const [etfs, setEtfs] = useState<ETFInfo[]>(DEFAULT_ETF_LIST)
-  const [selectedETF, setSelectedETF] = useState<ETFInfo>(etfs[0])
+  const [selectedETF, setSelectedETF] = useState<ETFInfo>(initialEtf ?? etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
   const { refresh, loading, backtest: workerBacktest } = useETFWorker()
@@ -70,9 +70,17 @@ export default function Detail() {
 
   useEffect(() => {
     getETFList().then(list => {
-      if (list.length > 0) { setEtfs(list); setSelectedETF(list[0]) }
+      if (list.length > 0) {
+        setEtfs(list)
+        if (!initialEtf) setSelectedETF(list[0])
+      }
     })
-  }, [])
+  }, [initialEtf])
+
+  // 看板点击卡片 → 切换到对应 ETF
+  useEffect(() => {
+    if (initialEtf) setSelectedETF(initialEtf)
+  }, [initialEtf?.code])
 
   useEffect(() => {
     if (!selectedETF) return

@@ -4,11 +4,13 @@ import Dashboard from './ui/Dashboard'
 import Detail from './ui/Detail'
 import FundPicker from './ui/FundPicker'
 import Settings from './ui/Settings'
+import type { ETFInfo } from './types'
 
 type Tab = 'dashboard' | 'detail' | 'fundpicker' | 'settings'
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [detailEtf, setDetailEtf] = useState<ETFInfo | null>(null)
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'dashboard', label: '看板', icon: '\u{1F4CA}' },
@@ -17,11 +19,16 @@ function App() {
     { key: 'settings', label: '设置', icon: '\u{2699}\u{FE0F}' },
   ]
 
+  const openDetail = (etf: ETFInfo) => {
+    setDetailEtf(etf)
+    setActiveTab('detail')
+  }
+
   return (
     <div className="app">
       <div className="app-content">
-        {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'detail' && <Detail />}
+        {activeTab === 'dashboard' && <Dashboard onOpenDetail={openDetail} />}
+        {activeTab === 'detail' && <Detail initialEtf={detailEtf} />}
         {activeTab === 'fundpicker' && <FundPicker />}
         {activeTab === 'settings' && <Settings />}
       </div>

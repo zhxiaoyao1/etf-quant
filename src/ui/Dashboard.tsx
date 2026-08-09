@@ -2,18 +2,13 @@ import { useState, useEffect } from 'react'
 import type { ETFInfo, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { useETFWorker } from '../hooks/useWorker'
-import { getETFList, saveETFList, getSignals, getKLines } from '../data/db'
-import { computeTrendSignal } from '../engine/etf/trendSignal'
+import { getETFList, saveETFList, getSignals } from '../data/db'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Dashboard.css'
 
-interface ScorePoint { date: string; score: number; signal: string }
-
-export default function Dashboard() {
+export default function Dashboard({ onOpenDetail }: { onOpenDetail: (etf: ETFInfo) => void }) {
   const [etfs, setEtfs] = useState<ETFInfo[]>([])
   const [signals, setSignals] = useState<Map<string, Signal>>(new Map())
-  const [modalETF, setModalETF] = useState<ETFInfo | null>(null)
-  const [recentScores, setRecentScores] = useState<ScorePoint[]>([])
   const { refresh, loading } = useETFWorker()
 
   useEffect(() => {
@@ -36,22 +31,6 @@ export default function Dashboard() {
       setSignals(map)
     })
   }, [])
-
-  const handleCardClick = async (etf: ETFInfo) => {
-    setModalETF(etf)
-    // 从K线实时计算近十日趋势分
-    const bars = await getKLines(etf.code)
-    if (bars.length < 20) {
-      setRecentScores([])
-      return
-    }
-    const points: ScorePoint[] = []
-    for (let i = bars.length - 1; i >= Math.max(19, bars.length - 10); i--) {
-      const t = computeTrendSignal(bars.slice(0, i + 1))
-      points.push({ date: bars[i].date, score: t.score, signal: t.signal })
-    }
-    setRecentScores(points)
-  }
 
   const handleRefresh = async () => {
     if (etfs.length === 0) return
@@ -83,7 +62,7 @@ export default function Dashboard() {
         {etfs.map(etf => {
           const sig = signals.get(etf.code)
           return (
-            <div key={etf.code} className="etf-card" onClick={() => handleCardClick(etf)}>
+            <div key={etf.code} className="etf-card" onClick={() => onOpenDetail(etf)}>
               <div className="etf-info">
                 <div className="etf-name">{etf.name}</div>
                 <div className="etf-code">{etf.code}.{etf.market}</div>
@@ -106,38 +85,6 @@ export default function Dashboard() {
           )
         })}
       </div>
-
-      {/* 近十日趋势分弹窗 */}
-      {modalETF && (
-        <div className="score-modal-overlay" onClick={() => setModalETF(null)}>
-          <div className="score-modal" onClick={e => e.stopPropagation()}>
-            <div className="score-modal-header">
-              <h3>{modalETF.name}</h3>
-              <span className="score-modal-code">{modalETF.code}.{modalETF.market}</span>
-              <button className="score-modal-close" onClick={() => setModalETF(null)}>✕</button>
-            </div>
-            <div className="score-list">
-              {recentScores.length === 0 ? (
-                <p className="score-empty">K线数据不足（需≥20天），请先点刷新拉取数据</p>
-              ) : (
-                recentScores.map((s, i) => (
-                  <div key={s.date} className="score-row">
-                    <span className="score-date">{s.date}</span>
-                    <span className="score-trend">
-                      {i < recentScores.length - 1 && (
-                        s.score > recentScores[i + 1].score ? '↑' :
-                        s.score < recentScores[i + 1].score ? '↓' : '→'
-                      )}
-                    </span>
-                    <span className="score-emoji">{signalEmoji(s.signal)}</span>
-                    <span className="score-num" style={{ color: signalColor(s.signal) }}>{s.score}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
