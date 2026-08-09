@@ -1,12 +1,9 @@
 import type { Signal, ETFInfo } from '../types'
 import { computeTrendSignal } from '../engine/etf/trendSignal'
-import { runBacktest } from '../engine/etf/backtest'
 import { fetchAllETFs } from '../data/etfFetcher'
 import { getKLines, saveKLines, saveSignal } from '../data/db'
 
-type WorkerMessage =
-  | { type: 'refresh'; etfs: ETFInfo[] }
-  | { type: 'backtest'; etfCode: string }
+type WorkerMessage = { type: 'refresh'; etfs: ETFInfo[] }
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const msg = e.data
@@ -33,16 +30,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         signals.push(signal)
       }
       self.postMessage({ type: 'analysisComplete', signals })
-
-    } else if (msg.type === 'backtest') {
-      const { etfCode } = msg
-      const bars = await getKLines(etfCode)
-      if (bars.length < 40) {
-        self.postMessage({ type: 'error', message: `需要至少40天K线数据，当前${bars.length}天` })
-        return
-      }
-      const result = runBacktest(bars)
-      self.postMessage({ type: 'backtestResult', result })
     }
 
   } catch (err) {

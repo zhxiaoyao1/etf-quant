@@ -5,6 +5,7 @@ import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { getETFList, getKLines, getSignals } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import { computeRegime } from '../engine/etf/trendSignal'
+import { runBacktest } from '../engine/etf/backtest'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
 
@@ -57,7 +58,7 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(initialEtf ?? etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { refresh, loading, backtest: workerBacktest } = useETFWorker()
+  const { refresh, loading } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btError, setBtError] = useState('')
@@ -319,7 +320,9 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     const ok = await ensureData()
     if (!ok) { setBacktesting(false); return }
     try {
-      const result = await workerBacktest(selectedETF.code)
+      // 主线程直接算（runBacktest 很轻量，无需 Worker，省去 Worker 创建延迟）
+      const fresh = await getKLines(selectedETF.code)
+      const result = runBacktest(fresh)
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })

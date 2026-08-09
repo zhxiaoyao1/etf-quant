@@ -33,23 +33,5 @@ export function useETFWorker() {
     []
   )
 
-  const backtest = useCallback(
-    (etfCode: string): Promise<any> => {
-      return new Promise((resolve, reject) => {
-        const worker = createWorker()
-        setLoading(true)
-        worker.onmessage = (e) => {
-          setLoading(false)
-          worker.terminate()
-          if (e.data.type === 'backtestResult') resolve(e.data.result)
-          else if (e.data.type === 'error') reject(new Error(e.data.message))
-        }
-        worker.onerror = (err) => { setLoading(false); worker.terminate(); reject(err) }
-        worker.postMessage({ type: 'backtest', etfCode })
-      })
-    },
-    []
-  )
-
-  return { refresh, backtest, loading }
+  return { refresh, loading }
 }
