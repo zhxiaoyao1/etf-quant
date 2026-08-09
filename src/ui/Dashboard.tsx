@@ -1,35 +1,19 @@
 import { useState, useEffect } from 'react'
-import type { ETFInfo, Signal, KLine } from '../types'
+import type { ETFInfo, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { useETFWorker } from '../hooks/useWorker'
 import { getETFList, saveETFList, getSignals, getKLines } from '../data/db'
 import { computeTrendSignal } from '../engine/etf/trendSignal'
-import { runPoolDiagnostics, type PoolFactorIC } from '../engine/etf/poolDiagnostics'
-import { runPortfolioBacktest, runRankingPortfolioBacktest, type PortfolioBacktestResult } from '../engine/etf/portfolioBacktest'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Dashboard.css'
 
 interface ScorePoint { date: string; score: number; signal: string }
-
-function icColor(v: number): string {
-  if (v > 0.1) return 'var(--green)'
-  if (v < -0.05) return 'var(--red)'
-  return 'var(--text-secondary)'
-}
-
-const factorLabel: Record<string, string> = {
-  trend: '趋势', momentum: '动量', volatility: '波动率', moneyFlow: '资金流', total: '综合',
-}
 
 export default function Dashboard() {
   const [etfs, setEtfs] = useState<ETFInfo[]>([])
   const [signals, setSignals] = useState<Map<string, Signal>>(new Map())
   const [modalETF, setModalETF] = useState<ETFInfo | null>(null)
   const [recentScores, setRecentScores] = useState<ScorePoint[]>([])
-  const [diagnosing, setDiagnosing] = useState(false)
-  const [diagByHorizon, setDiagByHorizon] = useState<{ forwardDays: number; factors: PoolFactorIC[] }[] | null>(null)
-  const [portfolio, setPortfolio] = useState<PortfolioBacktestResult | null>(null)
-  const [rankingPortfolio, setRankingPortfolio] = useState<PortfolioBacktestResult | null>(null)
   const { refresh, loading } = useETFWorker()
 
   useEffect(() => {
@@ -79,29 +63,6 @@ export default function Dashboard() {
     setSignals(new Map(map))
   }
 
-  // 池级策略诊断：多周期IC（5/20/60日）+ 组合回测
-  const handlePoolDiagnose = async () => {
-    setDiagnosing(true)
-    try {
-      const list = etfs.length > 0 ? etfs : await getETFList()
-      const barsByCode = new Map<string, KLine[]>()
-      for (const etf of list) {
-        const bars = await getKLines(etf.code)
-        if (bars.length >= 121) barsByCode.set(etf.code, bars)
-      }
-      if (barsByCode.size < 2) return
-      const results = [5, 20, 60].map(h => ({
-        forwardDays: h,
-        factors: runPoolDiagnostics(barsByCode, h).factors,
-      }))
-      setDiagByHorizon(results)
-      setPortfolio(runPortfolioBacktest(barsByCode))
-      setRankingPortfolio(runRankingPortfolioBacktest(barsByCode))
-    } finally {
-      setDiagnosing(false)
-    }
-  }
-
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -139,60 +100,12 @@ export default function Dashboard() {
                 ) : (
                   <span style={{ color: 'var(--text-secondary)' }}>--</span>
                 )}
-                <div className="score-label">{'总分'}</div>
+                <div className="score-label">{'趋势分'}</div>
               </div>
             </div>
           )
         })}
       </div>
-
-      {/* 池级策略诊断 */}
-      <section className="dashboard-diag">
-        <h3>池级策略诊断</h3>
-        <button className="refresh-btn" onClick={handlePoolDiagnose} disabled={diagnosing}>
-          {diagnosing ? '诊断中...' : '📊 运行诊断 + 组合回测'}
-        </button>
-        <p className="diag-note">
-          对全池跑4因子打分（趋势/动量排名/波动率/资金流），检验各因子在 5/20/60 日周期上的IC（动量在长周期理论上更有信息量），并跑组合回测（≥65买入、&lt;45清仓、分数定仓位）。
-        </p>
-        {diagByHorizon && diagByHorizon.length > 0 && (
-          <table className="diag-table">
-            <thead>
-              <tr>
-                <th>因子</th>
-                {diagByHorizon.map(d => <th key={d.forwardDays}>IC({d.forwardDays}日)</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {['trend', 'momentum', 'volatility', 'moneyFlow', 'total'].map(fid => (
-                <tr key={fid}>
-                  <td>{factorLabel[fid] ?? fid}</td>
-                  {diagByHorizon.map(d => {
-                    const f = d.factors.find(x => x.factor === fid)
-                    return (
-                      <td key={d.forwardDays} style={{ color: icColor(f?.ic ?? 0), fontWeight: 700 }}>
-                        {(f?.ic ?? 0).toFixed(3)}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {portfolio && portfolio.equityCurve.length > 0 && (
-          <div className="portfolio-result">
-            <div>阈值打分版（对比）：<b style={{ color: portfolio.totalReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>{(portfolio.totalReturn * 100).toFixed(1)}%</b>（年化 {(portfolio.annualizedReturn * 100).toFixed(1)}%）</div>
-            <div>最大回撤 {(portfolio.maxDrawdown * 100).toFixed(1)}% · 夏普 {portfolio.sharpeRatio.toFixed(2)} · 调仓 {portfolio.tradeCount} 次</div>
-          </div>
-        )}
-        {rankingPortfolio && rankingPortfolio.equityCurve.length > 0 && (
-          <div className="portfolio-result">
-            <div>排名组合（动量+低波·月频）：<b style={{ color: rankingPortfolio.totalReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>{(rankingPortfolio.totalReturn * 100).toFixed(1)}%</b>（年化 {(rankingPortfolio.annualizedReturn * 100).toFixed(1)}%）</div>
-            <div>最大回撤 <b style={{ color: 'var(--red)' }}>{(rankingPortfolio.maxDrawdown * 100).toFixed(1)}%</b> · 夏普 {rankingPortfolio.sharpeRatio.toFixed(2)} · 调仓 {rankingPortfolio.tradeCount} 次</div>
-          </div>
-        )}
-      </section>
 
       {/* 近十日趋势分弹窗 */}
       {modalETF && (
