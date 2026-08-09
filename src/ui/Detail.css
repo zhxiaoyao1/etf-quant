@@ -24,6 +24,20 @@
 .signal-text { font-size: 18px; font-weight: 700; }
 .signal-date { font-size: 12px; color: var(--text-secondary); }
 .signal-score-det { font-size: 28px; font-weight: 700; margin-left: auto; }
+.regime-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.regime-label { color: var(--text-secondary); }
+.regime-value { font-weight: 700; }
+.regime-er { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
 .factor-grid { display: flex; gap: 8px; margin-bottom: 12px; }
 .factor-item {
   flex: 1;

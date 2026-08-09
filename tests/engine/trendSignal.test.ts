@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeTrendSignal } from '../../src/engine/etf/trendSignal'
+import { computeTrendSignal, computeRegime } from '../../src/engine/etf/trendSignal'
 import type { KLine } from '../../src/types'
 
 function makeBar(date: string, close: number): KLine {
@@ -44,5 +44,21 @@ describe('computeTrendSignal（纯收盘价 vs MA20）', () => {
     const t = computeTrendSignal(bars)
     expect(t.score).toBeGreaterThanOrEqual(0)
     expect(t.score).toBeLessThanOrEqual(100)
+  })
+})
+
+describe('computeRegime（效率比率判趋势/震荡）', () => {
+  it('steady rise is a trend market', () => {
+    const bars = makeSeries(i => 10 + i * 0.1, 40)
+    const r = computeRegime(bars)
+    expect(r.regime).toBe('trend')
+    expect(r.er).toBeGreaterThan(0.8)
+  })
+
+  it('oscillating flat series is a range market', () => {
+    const bars = makeSeries(i => 10 + Math.sin(i * 1.0) * 1, 40)
+    const r = computeRegime(bars)
+    expect(r.regime).toBe('range')
+    expect(r.er).toBeLessThan(0.2)
   })
 })

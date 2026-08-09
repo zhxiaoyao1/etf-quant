@@ -4,6 +4,7 @@ import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { getETFList, getKLines, getSignals } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
+import { computeRegime } from '../engine/etf/trendSignal'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
 
@@ -324,6 +325,9 @@ export default function Detail() {
 
   const latestSignal = signals[0]
 
+  // 市场状态（效率比率）：近20日趋势/震荡
+  const regime = bars.length >= 21 ? computeRegime(bars) : null
+
   // 当前带宽状态：当前带宽 vs 近20日均值 → 扩张/收窄
   const widthData = calcBandWidth(bars)
   const curWidth = widthData.length > 0 ? widthData[widthData.length - 1].value : null
@@ -351,6 +355,16 @@ export default function Detail() {
             <div className="signal-date">{latestSignal.date}</div>
           </div>
           <div className="signal-score-det">{latestSignal.score}</div>
+        </div>
+      )}
+
+      {regime && (
+        <div className="regime-tag">
+          <span className="regime-label">市场状态：</span>
+          <span className="regime-value" style={{ color: regime.regime === 'trend' ? 'var(--green)' : regime.regime === 'range' ? 'var(--yellow)' : 'var(--text-secondary)' }}>
+            {regime.regime === 'trend' ? '📈 趋势市' : regime.regime === 'range' ? '🌀 震荡市' : '中性'}
+          </span>
+          <span className="regime-er">ER {regime.er.toFixed(2)}</span>
         </div>
       )}
 
