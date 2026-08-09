@@ -407,7 +407,7 @@ export default function Detail() {
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            收盘价&gt;MA20且带宽扩张买入 · &lt;MA20卖出
+            收盘价&gt;MA20买入 · &lt;MA20卖出
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">

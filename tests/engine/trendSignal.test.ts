@@ -16,24 +16,13 @@ function makeSeries(fn: (i: number) => number, n: number): KLine[] {
   return bars
 }
 
-describe('computeTrendSignal', () => {
-  it('scores buy when close above MA20 AND band expanding (breakout from squeeze)', () => {
-    // 长期横盘（带宽收窄）后最近几天放量突破 → 带宽扩张
-    const bars = makeSeries(i => {
-      if (i < 70) return 10
-      return [10.5, 11.2, 12.1][i - 70]
-    }, 73)
+describe('computeTrendSignal（纯收盘价 vs MA20）', () => {
+  it('scores buy when close above MA20', () => {
+    // 横盘后拉升，收盘明显高于 MA20
+    const bars = makeSeries(i => (i < 40 ? 10 : 10 + (i - 40) * 0.5), 80)
     const t = computeTrendSignal(bars)
     expect(t.score).toBeGreaterThan(50)
     expect(t.signal).toBe('buy')
-  })
-
-  it('holds when close above MA20 but band not expanding (steady rally)', () => {
-    // 匀速上涨：带宽恒定不扩张 → 观望，不追
-    const bars = makeSeries(i => 10 + i * 0.05, 80)
-    const t = computeTrendSignal(bars)
-    expect(t.score).toBeGreaterThan(50)
-    expect(t.signal).toBe('hold')
   })
 
   it('scores sell when close below MA20', () => {
