@@ -5,7 +5,7 @@ import { useETFWorker } from '../hooks/useWorker'
 import { getETFList, saveETFList, getSignals, getKLines } from '../data/db'
 import { computeTrendSignal } from '../engine/etf/trendSignal'
 import { runPoolDiagnostics, type PoolFactorIC } from '../engine/etf/poolDiagnostics'
-import { runPortfolioBacktest, type PortfolioBacktestResult } from '../engine/etf/portfolioBacktest'
+import { runPortfolioBacktest, runRankingPortfolioBacktest, type PortfolioBacktestResult } from '../engine/etf/portfolioBacktest'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Dashboard.css'
 
@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [diagnosing, setDiagnosing] = useState(false)
   const [diagByHorizon, setDiagByHorizon] = useState<{ forwardDays: number; factors: PoolFactorIC[] }[] | null>(null)
   const [portfolio, setPortfolio] = useState<PortfolioBacktestResult | null>(null)
+  const [rankingPortfolio, setRankingPortfolio] = useState<PortfolioBacktestResult | null>(null)
   const { refresh, loading } = useETFWorker()
 
   useEffect(() => {
@@ -95,6 +96,7 @@ export default function Dashboard() {
       }))
       setDiagByHorizon(results)
       setPortfolio(runPortfolioBacktest(barsByCode))
+      setRankingPortfolio(runRankingPortfolioBacktest(barsByCode))
     } finally {
       setDiagnosing(false)
     }
@@ -180,8 +182,14 @@ export default function Dashboard() {
         )}
         {portfolio && portfolio.equityCurve.length > 0 && (
           <div className="portfolio-result">
-            <div>组合回测：<b style={{ color: portfolio.totalReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>{(portfolio.totalReturn * 100).toFixed(1)}%</b>（年化 {(portfolio.annualizedReturn * 100).toFixed(1)}%）</div>
-            <div>最大回撤 <b style={{ color: 'var(--red)' }}>{(portfolio.maxDrawdown * 100).toFixed(1)}%</b> · 夏普 {portfolio.sharpeRatio.toFixed(2)} · 调仓 {portfolio.tradeCount} 次</div>
+            <div>阈值打分版（对比）：<b style={{ color: portfolio.totalReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>{(portfolio.totalReturn * 100).toFixed(1)}%</b>（年化 {(portfolio.annualizedReturn * 100).toFixed(1)}%）</div>
+            <div>最大回撤 {(portfolio.maxDrawdown * 100).toFixed(1)}% · 夏普 {portfolio.sharpeRatio.toFixed(2)} · 调仓 {portfolio.tradeCount} 次</div>
+          </div>
+        )}
+        {rankingPortfolio && rankingPortfolio.equityCurve.length > 0 && (
+          <div className="portfolio-result">
+            <div>排名组合（动量+低波·月频）：<b style={{ color: rankingPortfolio.totalReturn >= 0 ? 'var(--green)' : 'var(--red)' }}>{(rankingPortfolio.totalReturn * 100).toFixed(1)}%</b>（年化 {(rankingPortfolio.annualizedReturn * 100).toFixed(1)}%）</div>
+            <div>最大回撤 <b style={{ color: 'var(--red)' }}>{(rankingPortfolio.maxDrawdown * 100).toFixed(1)}%</b> · 夏普 {rankingPortfolio.sharpeRatio.toFixed(2)} · 调仓 {rankingPortfolio.tradeCount} 次</div>
           </div>
         )}
       </section>

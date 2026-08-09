@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runPortfolioBacktest } from '../../src/engine/etf/portfolioBacktest'
+import { runPortfolioBacktest, runRankingPortfolioBacktest } from '../../src/engine/etf/portfolioBacktest'
 import type { KLine } from '../../src/types'
 
 function makeBar(date: string, close: number): KLine {
@@ -47,5 +47,23 @@ describe('runPortfolioBacktest', () => {
   it('returns empty for insufficient pool', () => {
     const result = runPortfolioBacktest(new Map([['A', makeSeries(makeRegime(true))]]))
     expect(result.equityCurve).toHaveLength(0)
+  })
+})
+
+describe('runRankingPortfolioBacktest（排名组合：动量+低波）', () => {
+  it('ranking portfolio captures momentum and avoids noise, no explosion', () => {
+    // 4只：A/B 与 C/D 走势相反（A/B 强、C/D 弱），排名组合应持有强势的
+    const map = new Map([
+      ['A', makeSeries(makeRegime(true))],
+      ['B', makeSeries(makeRegime(true))],
+      ['C', makeSeries(makeRegime(false))],
+      ['D', makeSeries(makeRegime(false))],
+    ])
+    const result = runRankingPortfolioBacktest(map)
+    expect(result.equityCurve.length).toBeGreaterThan(0)
+    expect(result.totalReturn).toBeGreaterThan(0)
+    expect(result.totalReturn).toBeLessThan(100)
+    expect(result.tradeCount).toBeGreaterThan(0)
+    expect(result.maxDrawdown).toBeLessThanOrEqual(0)
   })
 })
