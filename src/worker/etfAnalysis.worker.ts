@@ -1,5 +1,5 @@
-import type { Signal, ETFInfo } from '../types'
-import { computeTrendSignal } from '../engine/etf/trendSignal'
+import type { Signal, ETFInfo, KLine } from '../types'
+import { scorePool } from '../engine/etf/poolScorer'
 import { runBacktest } from '../engine/etf/backtest'
 import { fetchAllETFs } from '../data/etfFetcher'
 import { getKLines, saveKLines, saveSignal } from '../data/db'
@@ -17,17 +17,21 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       for (const [code, bars] of data) {
         if (bars.length > 0) await saveKLines(code, bars)
       }
-      const signals: Signal[] = []
+      // 池级打分：动量排名需要整个池子一起算
+      const barsByCode = new Map<string, KLine[]>()
       for (const etf of etfs) {
         const bars = await getKLines(etf.code)
-        if (bars.length < 20) continue
-        const t = computeTrendSignal(bars)
+        if (bars.length >= 21) barsByCode.set(etf.code, bars)
+      }
+      const scores = scorePool(barsByCode)
+      const signals: Signal[] = []
+      for (const s of scores) {
         const signal: Signal = {
-          id: `etf-${etf.code}-${new Date().toISOString().slice(0, 10)}`,
-          etfCode: etf.code,
+          id: `etf-${s.code}-${new Date().toISOString().slice(0, 10)}`,
+          etfCode: s.code,
           date: new Date().toISOString().slice(0, 10),
-          score: t.score,
-          signal: t.signal,
+          score: s.total,
+          signal: s.signal,
         }
         await saveSignal(signal)
         signals.push(signal)
