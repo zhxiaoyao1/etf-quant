@@ -37,6 +37,9 @@ describe('runPortfolioBacktest', () => {
     expect(result.tradeCount).toBeGreaterThan(0)
     // 组合应在强势ETF上持仓、弱势ETF上空仓 → 总收益为正
     expect(result.totalReturn).toBeGreaterThan(0)
+    // 无杠杆：收益不会爆炸到天文数字
+    expect(result.totalReturn).toBeLessThan(100)
+    expect(result.totalReturn).toBeGreaterThan(-1)
     expect(typeof result.sharpeRatio).toBe('number')
     expect(result.maxDrawdown).toBeLessThanOrEqual(0)
   })

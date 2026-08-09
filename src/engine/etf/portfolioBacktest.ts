@@ -67,23 +67,23 @@ export function runPortfolioBacktest(
     }
     equityCurve.push({ date: barsByCode.get(codes[0])![t].date, value: equity })
 
-    // 目标权重
-    const buyCodes = codes.filter(c => totals[c] >= BUY)
-    const totalCap = buyCodes.reduce((s, c) => s + cap(totals[c]), 0)
+    // 目标权重：<45清仓，45-64持有现有不开新仓，≥65按分数仓位
     const targets: Record<string, number> = {}
-    for (const code of buyCodes) {
-      // 多只买入ETF总仓位超过100%时按比例缩放
-      targets[code] = totalCap > 1 ? cap(totals[code]) / totalCap : cap(totals[code])
-    }
     for (const code of codes) {
-      if (totals[code] >= BUY) continue
-      if (totals[code] >= SELL) {
-        // 45-64：持有现有，不开新仓
+      const t = totals[code]
+      if (t < SELL) {
+        targets[code] = 0
+      } else if (t < BUY) {
         const price = barsByCode.get(code)![t].close
-        targets[code] = (shares[code] ?? 0) > 0 && equity > 0 ? ((shares[code]! * price) / equity) : 0
+        targets[code] = (shares[code] ?? 0) > 0 && equity > 0 ? (shares[code]! * price) / equity : 0
       } else {
-        targets[code] = 0 // <45：清仓
+        targets[code] = cap(t)
       }
+    }
+    // 总仓位不超过100%：超了按比例缩放，防止隐性加杠杆导致复利爆炸
+    const sumTarget = Object.values(targets).reduce((s, w) => s + w, 0)
+    if (sumTarget > 1) {
+      for (const code of codes) targets[code] = (targets[code] ?? 0) / sumTarget
     }
 
     // 再平衡（t日收盘价）
