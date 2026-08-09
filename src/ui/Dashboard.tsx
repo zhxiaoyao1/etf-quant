@@ -4,7 +4,7 @@ import { DEFAULT_ETF_LIST } from '../config/defaults'
 import { useETFWorker } from '../hooks/useWorker'
 import { getETFList, saveETFList, getSignals, getKLines } from '../data/db'
 import { computeTrendSignal } from '../engine/etf/trendSignal'
-import { runPoolDiagnostics, type PoolDiagnosticsResult } from '../engine/etf/poolDiagnostics'
+import { runPoolDiagnostics, type PoolFactorIC } from '../engine/etf/poolDiagnostics'
 import { runPortfolioBacktest, type PortfolioBacktestResult } from '../engine/etf/portfolioBacktest'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Dashboard.css'
@@ -27,7 +27,7 @@ export default function Dashboard() {
   const [modalETF, setModalETF] = useState<ETFInfo | null>(null)
   const [recentScores, setRecentScores] = useState<ScorePoint[]>([])
   const [diagnosing, setDiagnosing] = useState(false)
-  const [poolDiag, setPoolDiag] = useState<PoolDiagnosticsResult | null>(null)
+  const [diagByHorizon, setDiagByHorizon] = useState<{ forwardDays: number; factors: PoolFactorIC[] }[] | null>(null)
   const [portfolio, setPortfolio] = useState<PortfolioBacktestResult | null>(null)
   const { refresh, loading } = useETFWorker()
 
@@ -78,7 +78,7 @@ export default function Dashboard() {
     setSignals(new Map(map))
   }
 
-  // 池级策略诊断：4因子IC + 组合回测
+  // 池级策略诊断：多周期IC（5/20/60日）+ 组合回测
   const handlePoolDiagnose = async () => {
     setDiagnosing(true)
     try {
@@ -86,10 +86,14 @@ export default function Dashboard() {
       const barsByCode = new Map<string, KLine[]>()
       for (const etf of list) {
         const bars = await getKLines(etf.code)
-        if (bars.length >= 61) barsByCode.set(etf.code, bars)
+        if (bars.length >= 121) barsByCode.set(etf.code, bars)
       }
       if (barsByCode.size < 2) return
-      setPoolDiag(runPoolDiagnostics(barsByCode, 5))
+      const results = [5, 20, 60].map(h => ({
+        forwardDays: h,
+        factors: runPoolDiagnostics(barsByCode, h).factors,
+      }))
+      setDiagByHorizon(results)
       setPortfolio(runPortfolioBacktest(barsByCode))
     } finally {
       setDiagnosing(false)
@@ -147,19 +151,28 @@ export default function Dashboard() {
           {diagnosing ? '诊断中...' : '📊 运行诊断 + 组合回测'}
         </button>
         <p className="diag-note">
-          对全池跑4因子打分（趋势/动量排名/波动率/资金流），检验各因子对未来5日收益的IC，并跑组合回测（≥65买入、&lt;45清仓、分数定仓位）。
+          对全池跑4因子打分（趋势/动量排名/波动率/资金流），检验各因子在 5/20/60 日周期上的IC（动量在长周期理论上更有信息量），并跑组合回测（≥65买入、&lt;45清仓、分数定仓位）。
         </p>
-        {poolDiag && (
+        {diagByHorizon && diagByHorizon.length > 0 && (
           <table className="diag-table">
             <thead>
-              <tr><th>因子</th><th>IC</th><th>样本</th></tr>
+              <tr>
+                <th>因子</th>
+                {diagByHorizon.map(d => <th key={d.forwardDays}>IC({d.forwardDays}日)</th>)}
+              </tr>
             </thead>
             <tbody>
-              {poolDiag.factors.map(f => (
-                <tr key={f.factor}>
-                  <td>{factorLabel[f.factor] ?? f.factor}</td>
-                  <td style={{ color: icColor(f.ic), fontWeight: 700 }}>{f.ic.toFixed(3)}</td>
-                  <td>{f.sampleCount}</td>
+              {['trend', 'momentum', 'volatility', 'moneyFlow', 'total'].map(fid => (
+                <tr key={fid}>
+                  <td>{factorLabel[fid] ?? fid}</td>
+                  {diagByHorizon.map(d => {
+                    const f = d.factors.find(x => x.factor === fid)
+                    return (
+                      <td key={d.forwardDays} style={{ color: icColor(f?.ic ?? 0), fontWeight: 700 }}>
+                        {(f?.ic ?? 0).toFixed(3)}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>
