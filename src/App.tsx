@@ -3,10 +3,11 @@ import './App.css'
 import Dashboard from './ui/Dashboard'
 import Detail from './ui/Detail'
 import FundPicker from './ui/FundPicker'
+import Factors from './ui/Factors'
 import Settings from './ui/Settings'
 import type { ETFInfo } from './types'
 
-type Tab = 'dashboard' | 'detail' | 'fundpicker' | 'settings'
+type Tab = 'dashboard' | 'detail' | 'fundpicker' | 'factors' | 'settings'
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
@@ -16,6 +17,7 @@ function App() {
     { key: 'dashboard', label: '看板', icon: '\u{1F4CA}' },
     { key: 'detail', label: '详情', icon: '\u{1F50D}' },
     { key: 'fundpicker', label: '选基', icon: '\u{1F3E6}' },
+    { key: 'factors', label: '因子', icon: '\u{1F9E0}' },
     { key: 'settings', label: '设置', icon: '\u{2699}\u{FE0F}' },
   ]
 
@@ -30,6 +32,7 @@ function App() {
         {activeTab === 'dashboard' && <Dashboard onOpenDetail={openDetail} />}
         {activeTab === 'detail' && <Detail initialEtf={detailEtf} />}
         {activeTab === 'fundpicker' && <FundPicker />}
+        {activeTab === 'factors' && <Factors />}
         {activeTab === 'settings' && <Settings />}
       </div>
       <nav className="nav">

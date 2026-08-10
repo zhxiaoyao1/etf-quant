@@ -2,56 +2,47 @@ import { describe, it, expect } from 'vitest'
 import { runBacktest } from '../../src/engine/etf/backtest'
 import type { KLine } from '../../src/types'
 
-function makeBar(date: string, close: number): KLine {
-  return { date, open: close, high: close * 1.01, low: close * 0.99, close, volume: 10000 }
+function makeBar(date: string, open: number, close: number): KLine {
+  return { date, open, high: Math.max(open, close) * 1.01, low: Math.min(open, close) * 0.99, close, volume: 10000 }
 }
 
-function makeSeries(fn: (i: number) => number, n: number): KLine[] {
-  const bars: KLine[] = []
-  for (let i = 0; i < n; i++) {
-    const d = new Date(2020, 0, 1)
-    d.setDate(d.getDate() + i)
-    bars.push(makeBar(d.toISOString().slice(0, 10), fn(i)))
-  }
-  return bars
-}
-
-describe('runBacktest（收盘价 vs MA20）', () => {
+describe('runBacktest', () => {
   it('returns empty result for insufficient data', () => {
-    const bars = makeSeries(() => 10, 15)
-    const result = runBacktest(bars)
+    const bars: KLine[] = []
+    for (let i = 0; i < 50; i++) {
+      const d = new Date(2026, 0, 1)
+      d.setDate(d.getDate() + i)
+      bars.push(makeBar(d.toISOString().slice(0, 10), 10, 10))
+    }
+    const result = runBacktest(bars, { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 })
     expect(result.totalTrades).toBe(0)
   })
 
-  it('does not buy when price stays at/below MA20', () => {
-    const bars = makeSeries(() => 10, 60)
-    const result = runBacktest(bars)
-    expect(result.totalTrades).toBe(0)
-  })
-
-  it('buys when price rises above MA20', () => {
-    // 横盘后拉升：收盘价上穿 MA20 → 买入并持有
-    const bars = makeSeries(i => (i < 40 ? 10 : 10 + (i - 40) * 0.2), 100)
-    const result = runBacktest(bars)
-    expect(result.totalTrades).toBeGreaterThanOrEqual(1)
+  it('generates trades on a strong trending market', () => {
+    const bars: KLine[] = []
+    for (let i = 0; i < 200; i++) {
+      const d = new Date(2020, 0, 1)
+      d.setDate(d.getDate() + i)
+      const price = 10 + i * 0.1 + Math.sin(i * 0.1) * 2
+      bars.push(makeBar(d.toISOString().slice(0, 10), price * 0.99, price))
+    }
+    const result = runBacktest(bars, { trend: 0.4, momentum: 0.2, volatility: 0.2, moneyFlow: 0.2 }, { buyThreshold: 60, sellThreshold: 30 })
+    expect(result.totalTrades).toBeGreaterThan(0)
     expect(result.equityCurve.length).toBeGreaterThan(0)
     expect(typeof result.sharpeRatio).toBe('number')
+    expect(typeof result.maxDrawdown).toBe('number')
     expect(result.maxDrawdown).toBeLessThanOrEqual(0)
   })
 
-  it('sells when price falls below MA20 after a rally', () => {
-    // 拉升后回落跌破 MA20 → 卖出，形成完整交易
-    const bars = makeSeries(i =>
-      i <= 70 ? 10 : (i <= 90 ? 10 + (i - 70) * 0.2 : 14 - (i - 90) * 0.2), 120)
-    const result = runBacktest(bars)
-    expect(result.totalTrades).toBeGreaterThanOrEqual(1)
-    const sellPrices = result.trades.filter(t => t.sellPrice != null).map(t => t.sellPrice!)
-    expect(sellPrices.length).toBeGreaterThan(0)
-  })
-
   it('buyAndHoldReturn matches simple price change', () => {
-    const bars = makeSeries(i => 10 + i * 0.05, 120)
-    const result = runBacktest(bars)
+    const bars: KLine[] = []
+    for (let i = 0; i < 200; i++) {
+      const d = new Date(2020, 0, 1)
+      d.setDate(d.getDate() + i)
+      bars.push(makeBar(d.toISOString().slice(0, 10), 10, 10 + i * 0.05))
+    }
+    const result = runBacktest(bars, { trend: 0.25, momentum: 0.25, volatility: 0.25, moneyFlow: 0.25 })
+    // Buy & hold should be positive since price trends up
     expect(result.buyAndHoldReturn).toBeGreaterThan(0)
   })
 })

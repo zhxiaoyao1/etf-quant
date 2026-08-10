@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createChart, CrosshairMode, LineStyle } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
-import { DEFAULT_ETF_LIST } from '../config/defaults'
-import { getETFList, getKLines, getSignals, getSetting, saveSetting } from '../data/db'
+import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
+import { getETFList, getKLines, getSignals, getSetting, getWeights } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
-import { computeRegime } from '../engine/etf/trendSignal'
 import { runBacktest } from '../engine/etf/backtest'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
@@ -58,17 +57,19 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
   const [selectedETF, setSelectedETF] = useState<ETFInfo>(initialEtf ?? etfs[0])
   const [bars, setBars] = useState<KLine[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
-  const { refresh, loading } = useETFWorker()
+  const { analyze, loading, fetchAndStore, optimize: workerOptimize, optimizeAll: workerOptimizeAll, learn: workerLearn } = useETFWorker()
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
+  const [btBuy, setBtBuy] = useState(70)
+  const [btSell, setBtSell] = useState(40)
   const [btError, setBtError] = useState('')
-  const [modeOverride, setModeOverride] = useState<'auto' | 'trend' | 'range'>('auto')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
   const candleSeriesRef = useRef<any>(null)
   const bandContainerRef = useRef<HTMLDivElement>(null)
   const bandChartRef = useRef<ReturnType<typeof createChart> | null>(null)
+
 
   useEffect(() => {
     getETFList().then(list => {
@@ -77,6 +78,8 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
         if (!initialEtf) setSelectedETF(list[0])
       }
     })
+    getSetting<number>('buyThreshold').then(v => { if (v) setBtBuy(v) })
+    getSetting<number>('sellThreshold').then(v => { if (v) setBtSell(v) })
   }, [initialEtf])
 
   // 看板点击卡片 → 切换到对应 ETF
@@ -92,26 +95,6 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     getKLines(selectedETF.code).then(setBars)
     getSignals({ etfCode: selectedETF.code, limit: 20 }).then(setSignals)
   }, [selectedETF])
-
-  // 加载该ETF的手动模式覆盖
-  useEffect(() => {
-    getSetting<Record<string, 'auto' | 'trend' | 'range'>>('modeOverrides').then(all => {
-      setModeOverride(all?.[selectedETF?.code ?? ''] ?? 'auto')
-    })
-  }, [selectedETF?.code])
-
-  // 手动切换模式：保存覆盖并重新分析该ETF
-  const handleModeChange = async (m: 'auto' | 'trend' | 'range') => {
-    setModeOverride(m)
-    if (!selectedETF) return
-    const all = (await getSetting<Record<string, 'auto' | 'trend' | 'range'>>('modeOverrides')) ?? {}
-    if (m === 'auto') delete all[selectedETF.code]
-    else all[selectedETF.code] = m
-    await saveSetting('modeOverrides', all)
-    await refresh([selectedETF])
-    const sigs = await getSignals({ etfCode: selectedETF.code, limit: 20 })
-    setSignals(sigs)
-  }
 
   const renderChart = useCallback(() => {
     const container = chartContainerRef.current
@@ -222,7 +205,7 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     }
   }, [renderChart])
 
-  // 布林带宽指示器：独立展示带宽收窄/扩张（不参与策略）
+  // 布林带宽指示器：独立展示带宽收窄/扩张（仅展示）
   useEffect(() => {
     const container = bandContainerRef.current
     if (!container || bars.length < 20) return
@@ -250,7 +233,6 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     const wSeries = chart.addLineSeries({ color: '#58a6ff', lineWidth: 1 })
     wSeries.setData(widthData)
 
-    // 20日平均带宽（虚线参考线）
     if (widthData.length >= 20) {
       const avgData = widthData.slice(19).map((p, idx) => {
         const win = widthData.slice(idx, idx + 20)
@@ -305,18 +287,19 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     series.setMarkers(markers)
   }, [backtestResult])
 
-  // 确保数据足够，不够就自动拉取（直接读IndexedDB，不依赖可能还没加载完的 bars 状态）
+
+
+  // 确保数据足够，不够就自动拉取
   const ensureData = async (): Promise<boolean> => {
     if (!selectedETF) return false
-    const stored = await getKLines(selectedETF.code)
-    if (stored.length >= 40) return true
+    if (bars.length >= 80) return true
     setBtError('K线数据不足，正在自动拉取...')
     try {
-      await refresh([selectedETF])
+      await fetchAndStore([selectedETF])
       const fresh = await getKLines(selectedETF.code)
       setBars(fresh)
-      if (fresh.length < 40) {
-        setBtError(`数据不足：仅${fresh.length}天K线（需≥40天）。请先点上方「刷新」按钮拉取数据。`)
+      if (fresh.length < 80) {
+        setBtError(`数据不足：仅${fresh.length}天K线（需≥80天）。请先点上方「刷新」按钮拉取数据。`)
         return false
       }
       setBtError('')
@@ -327,9 +310,74 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     }
   }
 
+  const handleOptimize = async () => {
+    if (!selectedETF) return
+    setBtError('')
+    setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
+    try {
+      const opt = await workerOptimize(selectedETF.code)
+      setBtBuy(opt.bestBuy)
+      setBtSell(opt.bestSell)
+      setBacktestResult(opt.result)
+      const { saveSetting } = await import('../data/db')
+      await saveSetting('buyThreshold', opt.bestBuy)
+      await saveSetting('sellThreshold', opt.bestSell)
+      setTimeout(() => {
+        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } catch (err: any) {
+      setBtError(err?.message || '寻优失败，请重试')
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
+  const handleOptimizeAll = async () => {
+    if (!selectedETF) return
+    setBtError('')
+    setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
+    try {
+      const opt = await workerOptimizeAll(selectedETF.code)
+      setBtBuy(opt.bestBuy)
+      setBtSell(opt.bestSell)
+      setBacktestResult(opt.result)
+      const { saveWeights, saveSetting } = await import('../data/db')
+      await saveWeights('etf', opt.bestWeights)
+      await saveSetting('buyThreshold', opt.bestBuy)
+      await saveSetting('sellThreshold', opt.bestSell)
+      setTimeout(() => {
+        document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } catch (err: any) {
+      setBtError(err?.message || '全优化失败，请重试')
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
+  const handleLearn = async () => {
+    if (!selectedETF) return
+    setBtError('')
+    setBacktesting(true)
+    const ok = await ensureData()
+    if (!ok) { setBacktesting(false); return }
+    try {
+      await workerLearn(selectedETF.code)
+      setBtError('✅ 自学习完成，权重已更新。因子仪表盘可查看详情')
+    } catch (err: any) {
+      setBtError(err?.message || '自学习失败')
+    } finally {
+      setBacktesting(false)
+    }
+  }
+
   const handleAnalyze = async () => {
     if (!selectedETF) return
-    const newSignals = await refresh([selectedETF])
+    const newSignals = await analyze([selectedETF])
     if (newSignals.length > 0) {
       setSignals(prev => [newSignals[0], ...prev].slice(0, 20))
     }
@@ -342,9 +390,10 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     const ok = await ensureData()
     if (!ok) { setBacktesting(false); return }
     try {
-      // 主线程直接算（runBacktest 很轻量，无需 Worker，省去 Worker 创建延迟）
+      // 主线程直接算（省去 Worker 创建延迟）
+      const weights = await getWeights('etf') ?? { ...DEFAULT_ETF_WEIGHTS }
       const fresh = await getKLines(selectedETF.code)
-      const result = runBacktest(fresh)
+      const result = runBacktest(fresh, weights, { buyThreshold: btBuy, sellThreshold: btSell })
       setBacktestResult(result)
       setTimeout(() => {
         document.querySelector('.backtest-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -357,22 +406,6 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
   }
 
   const latestSignal = signals[0]
-
-  // 市场状态（效率比率）：近20日趋势/震荡
-  const regime = bars.length >= 21 ? computeRegime(bars) : null
-  // 有效模式：手动覆盖优先，否则按ER自动
-  const effectiveMode: 'trend' | 'range' =
-    modeOverride === 'trend' || modeOverride === 'range'
-      ? modeOverride
-      : (regime?.regime === 'range' ? 'range' : 'trend')
-
-  // 当前带宽状态：当前带宽 vs 近20日均值 → 扩张/收窄
-  const widthData = calcBandWidth(bars)
-  const curWidth = widthData.length > 0 ? widthData[widthData.length - 1].value : null
-  const avgWidth = widthData.length >= 20
-    ? widthData.slice(-20).reduce((s, w) => s + w.value, 0) / 20
-    : curWidth
-  const bandExpanding = curWidth != null && avgWidth != null && curWidth > avgWidth
 
   return (
     <div className="detail">
@@ -392,26 +425,20 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
             <div className="signal-text">{signalLabel(latestSignal.signal)}</div>
             <div className="signal-date">{latestSignal.date}</div>
           </div>
-          <div className="signal-score-det">{latestSignal.score}</div>
+          <div className="signal-score-det">{latestSignal.compositeScore}</div>
         </div>
       )}
 
-      {regime && (
-        <div className="regime-tag">
-          <span className="regime-label">市场状态：</span>
-          <span className="regime-value" style={{ color: regime.regime === 'trend' ? 'var(--green)' : regime.regime === 'range' ? 'var(--yellow)' : 'var(--text-secondary)' }}>
-            {regime.regime === 'trend' ? '📈 趋势市' : regime.regime === 'range' ? '🌀 震荡市' : '中性'}
-          </span>
-          <span className="regime-mode" style={{ color: effectiveMode === 'range' ? 'var(--yellow)' : 'var(--green)' }}>
-            {effectiveMode === 'range' ? '→ 抄底模式' : '→ 顺势模式'}
-            {modeOverride !== 'auto' ? '(手动)' : ''}
-          </span>
-          <span className="regime-er">ER {regime.er.toFixed(2)}</span>
-          <select className="mode-select" value={modeOverride} onChange={e => handleModeChange(e.target.value as 'auto' | 'trend' | 'range')}>
-            <option value="auto">自动</option>
-            <option value="range">抄底</option>
-            <option value="trend">顺势</option>
-          </select>
+      {latestSignal && (
+        <div className="factor-grid">
+          {latestSignal.factorScores.map(fs => (
+            <div key={fs.factorId} className="factor-item">
+              <div className="factor-name">{fs.name}</div>
+              <div className="factor-value" style={{
+                color: fs.score >= 70 ? 'var(--green)' : fs.score < 40 ? 'var(--red)' : 'var(--yellow)'
+              }}>{fs.score}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -432,9 +459,6 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
             <>
               <div ref={bandContainerRef} className="band-chart-container" />
               <div className="ma-legend">
-                <span className="band-state" style={{ color: bandExpanding ? 'var(--green)' : 'var(--yellow)', fontWeight: 700 }}>
-                  带宽 {curWidth != null ? curWidth.toFixed(2) : '--'}% {bandExpanding ? '↑扩张' : '↓收窄'}
-                </span>
                 <span className="ma-legend-item"><span className="ma-dot" style={{background:'#58a6ff'}} /> 带宽</span>
                 <span className="ma-legend-item"><span className="ma-dot" style={{background:'#bc8cff'}} /> 20日均值</span>
               </div>
@@ -454,7 +478,7 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
           <div key={sig.id} className="history-item">
             <span>{sig.date}</span>
             <span>{signalEmoji(sig.signal)}</span>
-            <span style={{ color: signalColor(sig.signal) }}>{sig.score}</span>
+            <span style={{ color: signalColor(sig.signal) }}>{sig.compositeScore}</span>
           </div>
         ))}
         {signals.length === 0 && <div className="history-item"><span style={{color: 'var(--text-secondary)'}}>暂无信号记录</span></div>}
@@ -468,7 +492,12 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            震荡→抄底(下轨买/中轨卖) · 趋势→顺势(收盘vs MA20)
+            买入≥{btBuy} 卖出&lt;{btSell}
+            {backtestResult.finalWeights ? (
+              <span> · 学习后权重：趋势{(backtestResult.finalWeights.trend * 100).toFixed(0)}% 动量{(backtestResult.finalWeights.momentum * 100).toFixed(0)}% 波动{(backtestResult.finalWeights.volatility * 100).toFixed(0)}% 资金{(backtestResult.finalWeights.moneyFlow * 100).toFixed(0)}%</span>
+            ) : backtestResult.weights ? (
+              <span> · 权重：趋势{(backtestResult.weights.trend * 100).toFixed(0)}% 动量{(backtestResult.weights.momentum * 100).toFixed(0)}% 波动{(backtestResult.weights.volatility * 100).toFixed(0)}% 资金{(backtestResult.weights.moneyFlow * 100).toFixed(0)}%</span>
+            ) : null}
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">
@@ -538,6 +567,27 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
           disabled={backtesting}
         >
           {backtesting ? '⏳ 计算中...' : '📊 回测'}
+        </button>
+        <button
+          className="optimize-btn"
+          onClick={handleOptimize}
+          disabled={backtesting}
+        >
+          🤖 寻优阈值
+        </button>
+        <button
+          className="optimize-all-btn"
+          onClick={handleOptimizeAll}
+          disabled={backtesting}
+        >
+          🧬 寻优权重+阈值
+        </button>
+        <button
+          className="learn-btn"
+          onClick={handleLearn}
+          disabled={backtesting}
+        >
+          🧠 从历史学习
         </button>
       </div>
     </div>
