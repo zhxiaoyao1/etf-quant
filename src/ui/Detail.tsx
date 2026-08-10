@@ -284,10 +284,11 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     series.setMarkers(markers)
   }, [backtestResult])
 
-  // 确保数据足够，不够就自动拉取
+  // 确保数据足够，不够就自动拉取（直接读IndexedDB，不依赖可能还没加载完的 bars 状态）
   const ensureData = async (): Promise<boolean> => {
     if (!selectedETF) return false
-    if (bars.length >= 40) return true
+    const stored = await getKLines(selectedETF.code)
+    if (stored.length >= 40) return true
     setBtError('K线数据不足，正在自动拉取...')
     try {
       await refresh([selectedETF])
