@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createChart, CrosshairMode, LineStyle } from 'lightweight-charts'
 import type { ETFInfo, KLine, Signal } from '../types'
 import { DEFAULT_ETF_LIST } from '../config/defaults'
-import { getETFList, getKLines, getSignals } from '../data/db'
+import { getETFList, getKLines, getSignals, getSetting, saveSetting } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import { computeRegime } from '../engine/etf/trendSignal'
 import { runBacktest } from '../engine/etf/backtest'
@@ -62,6 +62,7 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [backtesting, setBacktesting] = useState(false)
   const [btError, setBtError] = useState('')
+  const [modeOverride, setModeOverride] = useState<'auto' | 'trend' | 'range'>('auto')
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
@@ -91,6 +92,26 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     getKLines(selectedETF.code).then(setBars)
     getSignals({ etfCode: selectedETF.code, limit: 20 }).then(setSignals)
   }, [selectedETF])
+
+  // 加载该ETF的手动模式覆盖
+  useEffect(() => {
+    getSetting<Record<string, 'auto' | 'trend' | 'range'>>('modeOverrides').then(all => {
+      setModeOverride(all?.[selectedETF?.code ?? ''] ?? 'auto')
+    })
+  }, [selectedETF?.code])
+
+  // 手动切换模式：保存覆盖并重新分析该ETF
+  const handleModeChange = async (m: 'auto' | 'trend' | 'range') => {
+    setModeOverride(m)
+    if (!selectedETF) return
+    const all = (await getSetting<Record<string, 'auto' | 'trend' | 'range'>>('modeOverrides')) ?? {}
+    if (m === 'auto') delete all[selectedETF.code]
+    else all[selectedETF.code] = m
+    await saveSetting('modeOverrides', all)
+    await refresh([selectedETF])
+    const sigs = await getSignals({ etfCode: selectedETF.code, limit: 20 })
+    setSignals(sigs)
+  }
 
   const renderChart = useCallback(() => {
     const container = chartContainerRef.current
@@ -339,6 +360,11 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
 
   // 市场状态（效率比率）：近20日趋势/震荡
   const regime = bars.length >= 21 ? computeRegime(bars) : null
+  // 有效模式：手动覆盖优先，否则按ER自动
+  const effectiveMode: 'trend' | 'range' =
+    modeOverride === 'trend' || modeOverride === 'range'
+      ? modeOverride
+      : (regime?.regime === 'range' ? 'range' : 'trend')
 
   // 当前带宽状态：当前带宽 vs 近20日均值 → 扩张/收窄
   const widthData = calcBandWidth(bars)
@@ -376,10 +402,16 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
           <span className="regime-value" style={{ color: regime.regime === 'trend' ? 'var(--green)' : regime.regime === 'range' ? 'var(--yellow)' : 'var(--text-secondary)' }}>
             {regime.regime === 'trend' ? '📈 趋势市' : regime.regime === 'range' ? '🌀 震荡市' : '中性'}
           </span>
-          <span className="regime-mode" style={{ color: regime.regime === 'range' ? 'var(--yellow)' : 'var(--green)' }}>
-            {regime.regime === 'range' ? '→ 抄底模式' : '→ 顺势模式'}
+          <span className="regime-mode" style={{ color: effectiveMode === 'range' ? 'var(--yellow)' : 'var(--green)' }}>
+            {effectiveMode === 'range' ? '→ 抄底模式' : '→ 顺势模式'}
+            {modeOverride !== 'auto' ? '(手动)' : ''}
           </span>
           <span className="regime-er">ER {regime.er.toFixed(2)}</span>
+          <select className="mode-select" value={modeOverride} onChange={e => handleModeChange(e.target.value as 'auto' | 'trend' | 'range')}>
+            <option value="auto">自动</option>
+            <option value="range">抄底</option>
+            <option value="trend">顺势</option>
+          </select>
         </div>
       )}
 

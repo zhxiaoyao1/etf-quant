@@ -26,6 +26,7 @@ export interface Signal {
   date: string
   score: number // 趋势分 0-100，50=收盘价正好在 MA20 上
   signal: 'buy' | 'hold' | 'sell' // 🟢🟡🔴
+  mode?: 'trend' | 'range' // 当前用的模式（顺势/抄底）
 }
 
 /** IndexedDB schema */

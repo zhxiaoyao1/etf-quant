@@ -70,6 +70,11 @@ export default function Dashboard({ onOpenDetail }: { onOpenDetail: (etf: ETFInf
               <div className="etf-signal">
                 <span className="signal-emoji">{sig ? signalEmoji(sig.signal) : '⚪'}</span>
                 <div className="signal-label">{sig ? signalLabel(sig.signal) : '待分析'}</div>
+                {sig?.mode && (
+                  <div className="etf-mode" style={{ color: sig.mode === 'range' ? 'var(--yellow)' : 'var(--green)' }}>
+                    {sig.mode === 'range' ? '🌀抄底' : '📈顺势'}
+                  </div>
+                )}
               </div>
               <div className="etf-score">
                 {sig ? (

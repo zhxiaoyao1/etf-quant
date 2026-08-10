@@ -39,6 +39,7 @@
 .etf-signal { text-align: center; }
 .signal-emoji { font-size: 24px; }
 .signal-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.etf-mode { font-size: 10px; margin-top: 2px; }
 .etf-score { text-align: right; }
 .score-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 .empty-state { text-align: center; padding: 40px 0; color: var(--text-secondary); }

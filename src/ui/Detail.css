@@ -38,6 +38,14 @@
 .regime-label { color: var(--text-secondary); }
 .regime-value { font-weight: 700; }
 .regime-er { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+.mode-select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 2px 6px;
+}
 .factor-grid { display: flex; gap: 8px; margin-bottom: 12px; }
 .factor-item {
   flex: 1;

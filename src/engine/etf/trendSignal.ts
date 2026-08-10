@@ -67,13 +67,14 @@ export interface DualModeSignal {
 }
 
 /**
- * 双模式策略信号：按市场状态（效率比率 ER）自动切换。
+ * 双模式策略信号：默认按市场状态（效率比率 ER）自动切换，也可强制指定模式。
  * - 趋势市（ER≥0.2）：顺势模式，收盘价>MA20买、<MA20卖
  * - 震荡市（ER<0.2）：抄底模式，收盘价≤布林下轨买、≥中轨卖
+ * @param forcedMode 手动指定模式（trend=顺势/range=抄底），不传则按ER自动
  */
-export function computeDualSignal(bars: KLine[], maPeriod: number = MA_PERIOD): DualModeSignal {
+export function computeDualSignal(bars: KLine[], maPeriod: number = MA_PERIOD, forcedMode?: 'trend' | 'range'): DualModeSignal {
   const regime = computeRegime(bars, maPeriod)
-  const mode: 'trend' | 'range' = regime.regime === 'range' ? 'range' : 'trend'
+  const mode: 'trend' | 'range' = forcedMode ?? (regime.regime === 'range' ? 'range' : 'trend')
   const close = bars[bars.length - 1]?.close ?? 0
 
   if (mode === 'range') {
