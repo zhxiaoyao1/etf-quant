@@ -376,6 +376,9 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
           <span className="regime-value" style={{ color: regime.regime === 'trend' ? 'var(--green)' : regime.regime === 'range' ? 'var(--yellow)' : 'var(--text-secondary)' }}>
             {regime.regime === 'trend' ? '📈 趋势市' : regime.regime === 'range' ? '🌀 震荡市' : '中性'}
           </span>
+          <span className="regime-mode" style={{ color: regime.regime === 'range' ? 'var(--yellow)' : 'var(--green)' }}>
+            {regime.regime === 'range' ? '→ 抄底模式' : '→ 顺势模式'}
+          </span>
           <span className="regime-er">ER {regime.er.toFixed(2)}</span>
         </div>
       )}
@@ -433,7 +436,7 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
             · 共 {backtestResult.equityCurve.length} 个交易日
           </div>
           <div className="backtest-params">
-            收盘价&gt;MA20买入 · &lt;MA20卖出
+            震荡→抄底(下轨买/中轨卖) · 趋势→顺势(收盘vs MA20)
           </div>
           <div className="backtest-metrics">
             <div className="backtest-metric">

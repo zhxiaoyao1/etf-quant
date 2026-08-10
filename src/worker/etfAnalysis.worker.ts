@@ -1,5 +1,5 @@
 import type { Signal, ETFInfo } from '../types'
-import { computeTrendSignal } from '../engine/etf/trendSignal'
+import { computeDualSignal } from '../engine/etf/trendSignal'
 import { fetchAllETFs } from '../data/etfFetcher'
 import { getKLines, saveKLines, saveSignal } from '../data/db'
 
@@ -18,13 +18,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       for (const etf of etfs) {
         const bars = await getKLines(etf.code)
         if (bars.length < 20) continue
-        const t = computeTrendSignal(bars)
+        const d = computeDualSignal(bars)
         const signal: Signal = {
           id: `etf-${etf.code}-${new Date().toISOString().slice(0, 10)}`,
           etfCode: etf.code,
           date: new Date().toISOString().slice(0, 10),
-          score: t.score,
-          signal: t.signal,
+          score: d.score,
+          signal: d.signal,
         }
         await saveSignal(signal)
         signals.push(signal)

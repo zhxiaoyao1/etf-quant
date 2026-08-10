@@ -52,3 +52,13 @@ export function atr(bars: KLine[], period: number): number {
   return sum / period
 }
 
+/** 布林带最新值：上轨/中轨/下轨（基于近 period 根收盘价） */
+export function bollingerLast(bars: KLine[], period = 20, stdDev = 2): { upper: number; middle: number; lower: number } {
+  if (bars.length < period) return { upper: 0, middle: 0, lower: 0 }
+  const closes = bars.slice(-period).map(b => b.close)
+  const mean = closes.reduce((s, v) => s + v, 0) / period
+  const variance = closes.reduce((s, v) => s + (v - mean) ** 2, 0) / period
+  const std = Math.sqrt(variance)
+  return { upper: mean + stdDev * std, middle: mean, lower: mean - stdDev * std }
+}
+

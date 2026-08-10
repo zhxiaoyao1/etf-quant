@@ -1,6 +1,6 @@
 import type { KLine } from '../../types'
-import { sma } from '../common'
-import { MA_PERIOD } from './trendSignal'
+import { sma, bollingerLast } from '../common'
+import { MA_PERIOD, computeRegime } from './trendSignal'
 
 export interface BacktestTrade {
   buyDate: string
@@ -25,9 +25,9 @@ export interface BacktestResult {
 }
 
 /**
- * 最简均线策略回测：
- * - 买入：收盘价 > MA20 → 次日开盘满仓
- * - 卖出：收盘价 < MA20 → 次日开盘清仓
+ * 双模式策略回测：按市场状态（效率比率 ER）自动切换。
+ * - 趋势市（ER≥0.2）：顺势——收盘价>MA20买、<MA20卖
+ * - 震荡市（ER<0.2）：抄底——收盘价≤布林下轨买、≥中轨卖
  * @param bars K线数据（按日期升序）
  * @param maPeriod 均线周期（默认 20）
  * @param initialCapital 初始资金（默认 10万）
@@ -55,10 +55,26 @@ export function runBacktest(
   const closes = bars.map(b => b.close)
 
   for (let i = maPeriod; i < bars.length - 1; i++) {
-    const ma = sma(closes.slice(0, i + 1), maPeriod)
-    const above = closes[i] > ma
+    const slice = bars.slice(0, i + 1)
+    const close = closes[i]
 
-    if (!holding && above) {
+    // 市场状态决定模式：震荡市→抄底，趋势市→顺势
+    const regime = computeRegime(slice, maPeriod)
+    const rangeMode = regime.regime === 'range'
+
+    let shouldBuy = false
+    let shouldSell = false
+    if (rangeMode) {
+      const { middle, lower } = bollingerLast(slice, maPeriod)
+      if (lower > 0 && close <= lower && close < middle) shouldBuy = true
+      if (close >= middle) shouldSell = true
+    } else {
+      const ma = sma(closes.slice(0, i + 1), maPeriod)
+      if (close > ma) shouldBuy = true
+      else if (close < ma) shouldSell = true
+    }
+
+    if (!holding && shouldBuy) {
       const nextOpen = bars[i + 1].open
       shares = cash / nextOpen
       cash = 0
@@ -66,7 +82,7 @@ export function runBacktest(
       buyPrice = nextOpen
       buyDate = bars[i + 1].date
     }
-    else if (holding && !above) {
+    else if (holding && shouldSell) {
       const nextOpen = bars[i + 1].open
       cash = shares * nextOpen
       const tradeReturn = (nextOpen - buyPrice) / buyPrice
