@@ -5,6 +5,7 @@ import { DEFAULT_ETF_LIST, DEFAULT_ETF_WEIGHTS } from '../config/defaults'
 import { getETFList, getKLines, getSignals, getSetting, getWeights } from '../data/db'
 import { useETFWorker } from '../hooks/useWorker'
 import { runBacktest } from '../engine/etf/backtest'
+import { scoreETF } from '../engine/etf/scorer'
 import { signalEmoji, signalLabel, signalColor } from './signalHelpers'
 import './Detail.css'
 
@@ -35,6 +36,31 @@ function calcBollinger(
   return { upper, middle, lower }
 }
 
+/** 从K线滚动计算最近 N 个交易日的信号（含MA5方向过滤，最新在前） */
+function computeRecentSignals(
+  bars: KLine[],
+  weights: Record<string, number>,
+  thresholds: { buyThreshold: number; sellThreshold: number } | undefined
+): { date: string; signal: string; compositeScore: number }[] {
+  if (bars.length < 61) return []
+  const start = Math.max(60, bars.length - 10)
+  const points: { date: string; signal: string; compositeScore: number }[] = []
+  for (let i = bars.length - 1; i >= start; i--) {
+    const result = scoreETF(bars.slice(0, i + 1), weights, thresholds)
+    let finalSignal = result.signal
+    if (i >= 4) {
+      const last5 = bars.slice(i - 4, i + 1)
+      const prev5 = bars.slice(Math.max(0, i - 7), i - 2)
+      const ma5Now = last5.reduce((s, b) => s + b.close, 0) / 5
+      const ma5Prev = prev5.reduce((s, b) => s + b.close, 0) / 5
+      if (result.signal === 'buy' && ma5Now <= ma5Prev) finalSignal = 'hold'
+      if (result.signal === 'sell' && ma5Now >= ma5Prev) finalSignal = 'hold'
+    }
+    points.push({ date: bars[i].date, signal: finalSignal, compositeScore: result.compositeScore })
+  }
+  return points
+}
+
 /** 布林带宽（%）：(上轨-下轨)/中轨×100，衡量波动扩张/收窄 */
 function calcBandWidth(bars: KLine[], period = 20, stdDev = 2): { time: string; value: number }[] {
   const width: { time: string; value: number }[] = []
@@ -63,6 +89,7 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
   const [btBuy, setBtBuy] = useState(70)
   const [btSell, setBtSell] = useState(40)
   const [btError, setBtError] = useState('')
+  const [recentSignals, setRecentSignals] = useState<{ date: string; signal: string; compositeScore: number }[]>([])
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
@@ -95,6 +122,16 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
     getKLines(selectedETF.code).then(setBars)
     getSignals({ etfCode: selectedETF.code, limit: 20 }).then(setSignals)
   }, [selectedETF])
+
+  // 信号历史：从K线滚动计算最近10个交易日（不依赖稀疏的存储信号）
+  useEffect(() => {
+    if (bars.length < 61) { setRecentSignals([]); return }
+    Promise.all([getWeights('etf'), getSetting<number>('buyThreshold'), getSetting<number>('sellThreshold')]).then(([w, buy, sell]) => {
+      const weights = w ?? { ...DEFAULT_ETF_WEIGHTS }
+      const thresholds = (buy && sell) ? { buyThreshold: buy, sellThreshold: sell } : undefined
+      setRecentSignals(computeRecentSignals(bars, weights, thresholds))
+    })
+  }, [bars])
 
   const renderChart = useCallback(() => {
     const container = chartContainerRef.current
@@ -472,16 +509,16 @@ export default function Detail({ initialEtf }: { initialEtf?: ETFInfo | null }) 
         </div>
       )}
 
-      <h3 className="section-title">信号历史</h3>
+      <h3 className="section-title">信号历史（近10个交易日）</h3>
       <div className="signal-history">
-        {signals.slice(0, 10).map(sig => (
-          <div key={sig.id} className="history-item">
-            <span>{sig.date}</span>
-            <span>{signalEmoji(sig.signal)}</span>
-            <span style={{ color: signalColor(sig.signal) }}>{sig.compositeScore}</span>
+        {recentSignals.map((s, i) => (
+          <div key={s.date} className="history-item">
+            <span>{i === 0 ? '今日' : s.date}</span>
+            <span>{signalEmoji(s.signal)}</span>
+            <span style={{ color: signalColor(s.signal) }}>{s.compositeScore}</span>
           </div>
         ))}
-        {signals.length === 0 && <div className="history-item"><span style={{color: 'var(--text-secondary)'}}>暂无信号记录</span></div>}
+        {recentSignals.length === 0 && <div className="history-item"><span style={{color: 'var(--text-secondary)'}}>K线数据不足（需≥61天）</span></div>}
       </div>
 
       {backtestResult && backtestResult.equityCurve.length > 0 && (
